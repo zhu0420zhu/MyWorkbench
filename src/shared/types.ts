@@ -1391,3 +1391,99 @@ export interface SkillImportResult {
   count: number
   error?: string
 }
+
+/* ============================================================
+ * 信息流（feed）—— 全网热点 × 智能体 统一抽象
+ * 同时被主进程（src/main/feed）、preload 双写、渲染层引用，故置于 shared。
+ * Phase A：仅新增类型，无行为变更。
+ * ============================================================ */
+
+/** 统一条目：全网热点事件 与 智能体结果 都映射到此结构 */
+export interface FeedItem {
+  /** 稳定 id（热点走 simhash hex；智能体走 title hash） */
+  id: string
+  title: string
+  url?: string
+  /** 展示热度 / 权重（热点=热度值；智能体=点数/权重，可为 0） */
+  hot: number
+  /** 条目级来源：可能是多平台共识（热点）或单来源（智能体） */
+  sources: FeedItemSource[]
+  /** 来源类别：'hot' = 热点平台；'agent' = 智能体任务 */
+  sourceKind: 'hot' | 'agent'
+  /** 数据归属的 FeedSource id（如 weibo / hn-briefing） */
+  sourceId: string
+  /** 分类（复用 categorize，智能体条目默认 '科技'） */
+  category: string
+  /** 额外元信息（如 HN 的「120 分 · torvalds」） */
+  meta?: string
+  firstSeen: number
+}
+
+export interface FeedItemSource {
+  platform: string // 平台/任务 id（weibo / hn-briefing / release-radar）
+  name: string // 展示名（微博 / Hacker News 简报 / Release Radar）
+  title: string
+  url: string
+  hot: number
+}
+
+/** 数据源元信息（管理面板用） */
+export interface FeedSourceMeta {
+  id: string
+  name: string
+  kind: 'hot' | 'agent'
+  description?: string
+  /** 该源产出的条目分类倾向（用于默认归类） */
+  defaultCategory?: string
+  /** 是否已启用（参与合并 feed / 通知） */
+  enabled: boolean
+  /** 周期毫秒（智能体任务用；热点平台为 0=实时聚合） */
+  intervalMs: number
+  lastRunAt: number | null
+  lastStatus: 'idle' | 'ok' | 'error'
+  lastSummary?: string
+  /** 单源最近一次产出的条目数 */
+  lastItemCount: number
+}
+
+export interface FeedSourceStatus {
+  id: string
+  status: 'ok' | 'error'
+  count: number
+  error?: string
+}
+
+/** 合并后的信息流结果（替代 HotFetchResult 给渲染层用） */
+export interface FeedResult {
+  items: FeedItem[]
+  sources: FeedSourceStatus[]
+  updatedAt: number
+}
+
+/** 数据源配置（启用 / 周期） */
+export interface FeedSourceConfig {
+  enabled: boolean
+  intervalMs: number
+}
+
+/** 统一通知设置（合并 hotNotifier + 智能体通知） */
+export type FeedNotifySettings = {
+  enabled: boolean
+  intervalMinutes: number
+  topCount: number
+  /** 是否对智能体运行结果也弹通知（默认 true） */
+  notifyAgents: boolean
+}
+
+/** 数据源运行历史记录（feed 层自己的历史，区别于 AgentRunRecord） */
+export interface FeedRunRecord {
+  id: string
+  sourceId: string
+  at: number
+  ok: boolean
+  summary: string
+  itemCount: number
+  /** 本次运行的产出条目（未落库时为 undefined） */
+  items?: FeedItem[]
+  error?: string
+}

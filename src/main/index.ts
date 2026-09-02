@@ -71,6 +71,8 @@ import { registerMcpIpc } from './mcp/mcpIpc'
 import { registerNotesFeatureIpc } from './notesFeature/notesFeatureIpc'
 import { registerNovelIpc } from './novel/novelIpc'
 import { registerSillyTavernIpc } from './sillytavern/sillytavernIpc'
+import { registerFeedIpc } from './feed/feedIpc'
+import { getFeedService } from './feed/feedService'
 import { getPrefs, setPrefs } from './prefs'
 import {
   listSnapshots,
@@ -610,6 +612,8 @@ app.whenReady().then(async () => {
   registerConvertIpc()
   registerSearchIndexIpc()
   registerAgentsIpc()
+  registerFeedIpc()
+  getFeedService().start()
   registerKnowledgeBaseIpc()
   registerKbDataIpc()
   registerMcpIpc()
