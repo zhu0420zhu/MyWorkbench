@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { ConfigStore } from '../configStore.ts'
 import { getLogger } from '../tools/logger.ts'
 import { getAgentScheduler } from '../agents/index.ts'
+import { loadNotifySettings, saveNotifySettings } from '../hotNotifier.ts'
 import { createHotSources } from './sources/hotSource.ts'
 import { createAgentSources } from './sources/agentSource.ts'
 import { aggregateFeed } from './aggregator.ts'
@@ -112,11 +113,21 @@ export class FeedService {
   }
 
   async getNotifySettings(): Promise<FeedNotifySettings> {
-    return this.notifySettings.get()
+    const hot = await loadNotifySettings()
+    const full = await this.notifySettings.get()
+    return { ...hot, notifyAgents: full.notifyAgents }
   }
 
   async setNotifySettings(s: FeedNotifySettings): Promise<FeedNotifySettings> {
-    return this.notifySettings.set(s)
+    // notifyAgents 持久化到 feed 配置；热点周期推送（enabled/intervalMinutes/topCount）
+    // 交由 hotNotifier 驱动其定时器（原 hot:notifier-set → saveNotifySettings 行为），恢复后保留原能力。
+    await this.notifySettings.set(s)
+    await saveNotifySettings({
+      enabled: s.enabled,
+      intervalMinutes: s.intervalMinutes,
+      topCount: s.topCount
+    })
+    return this.getNotifySettings()
   }
 
   /** 启动周期调度：每 60s 扫描到期（intervalMs>0 且 enabled）的数据源 */
