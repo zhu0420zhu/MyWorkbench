@@ -1,0 +1,100 @@
+{
+  "name": "lingmo-workbench",
+  "version": "0.1.0",
+  "description": "灵墨工作台：工具聚合 + 知识库 + 数据库 + 白板 + 自动化 + AI",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "npx electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "build:win": "electron-vite build && electron-builder --win",
+    "test:parse": "node --experimental-strip-types tests/verify-csv-parse.ts",
+    "test:pinyin": "node --experimental-strip-types tests/verify-pinyin.ts",
+    "test:analytics": "node --experimental-strip-types tests/verify-analytics-chart.ts",
+    "test:analytics-filters": "node --experimental-strip-types tests/verify-analytics-filters.ts",
+    "test:kb-data-asset": "node --experimental-strip-types tests/verify-kb-data-asset.ts",
+    "test:encoding": "node --experimental-strip-types tests/encoding.ts",
+    "bench:csv": "node --experimental-strip-types tests/bench-csv.ts",
+    "bench:import": "node --experimental-strip-types tests/bench-import.ts",
+    "bench:storage": "node --max-old-space-size=4096 --experimental-strip-types tests/bench-storage.ts",
+    "test:integration": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/integration-tables.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "antd": "^5.29.3",
+    "dailyhot-api": "^2.0.8",
+    "dompurify": "^3.4.12",
+    "echarts": "^6.1.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "hono": "^4.13.1",
+    "@hono/node-server": "^1.19.17",
+    "marked": "^18.0.7",
+    "pinyin-pro": "^3.29.3",
+    "onnxruntime-web": "^1.16.3",
+    "paddle-ocr-onnx-models": "^0.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tldraw": "^5.2.5",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "xlsx": "^0.18.5"
+  },
+  "build": {
+    "appId": "com.lingmo.workbench",
+    "productName": "灵墨工作台",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "electronDownload": {
+      "isVerifyChecksum": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "灵墨工作台",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  }
+}

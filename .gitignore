@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+release/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Env
+.env
+.env.local
+
+# SQLite / runtime data (generated at runtime)
+*.db
+*.sqlite
