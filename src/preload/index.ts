@@ -37,6 +37,12 @@ import type {
   HotNotifierStatus,
   GzhConfigInfo,
   HotItem,
+  FeedItem,
+  FeedResult,
+  FeedSourceMeta,
+  FeedSourceConfig,
+  FeedNotifySettings,
+  FeedRunRecord,
   OrganizeAction,
   OrganizeOptions,
   OrganizePlanPreview,
@@ -627,6 +633,21 @@ const api = {
     notifierSet: (s: HotNotifySettings): Promise<HotNotifySettings> => ipcRenderer.invoke('hot:notifier-set', s),
     notifierStatus: (): Promise<HotNotifierStatus> => ipcRenderer.invoke('hot:notifier-status'),
     notifierCheck: (): Promise<{ notified: number; total: number }> => ipcRenderer.invoke('hot:notifier-check')
+  },
+  /* ---- feed：全网热点 × 智能体 统一情报流（渲染层新入口，旧 hot/agents 保留待迁移） ---- */
+  feed: {
+    result: (): Promise<FeedResult> => ipcRenderer.invoke('feed:result'),
+    listSources: (): Promise<FeedSourceMeta[]> => ipcRenderer.invoke('feed:list-sources'),
+    runSource: (id: string): Promise<FeedItem[]> => ipcRenderer.invoke('feed:run-source', id),
+    setSourceConfig: (id: string, c: FeedSourceConfig): Promise<void> =>
+      ipcRenderer.invoke('feed:set-source-config', id, c),
+    history: (id: string): Promise<FeedRunRecord[]> => ipcRenderer.invoke('feed:history', id),
+    notifyGet: (): Promise<FeedNotifySettings> => ipcRenderer.invoke('feed:notify-get'),
+    notifySet: (s: FeedNotifySettings): Promise<FeedNotifySettings> =>
+      ipcRenderer.invoke('feed:notify-set', s),
+    notifyCheck: (): Promise<{ notified: number; total: number }> =>
+      ipcRenderer.invoke('feed:notify-check'),
+    notifyStatus: (): Promise<HotNotifierStatus> => ipcRenderer.invoke('feed:notify-status')
   },
   pickTextFile: (): Promise<{ name: string; content: string } | null> =>
     ipcRenderer.invoke('file:pick-text'),

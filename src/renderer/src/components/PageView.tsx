@@ -6,7 +6,7 @@ import TextTools from '../pages/TextTools'
 import FileTools from '../pages/FileTools'
 import KnowledgeBase from '../pages/KnowledgeBase'
 import Stickies from '../pages/Stickies'
-import Hotspots from '../pages/Hotspots'
+import FeedCenter from '../pages/FeedCenter'
 import Settings from '../pages/Settings'
 import Writing from '../pages/Writing'
 import Copywriting from '../pages/Copywriting'
@@ -21,8 +21,9 @@ import type { PageKey } from '../nav'
  *
  * 融合后：
  *   - AI 助手 并入 自动工作台（dashboard）
- *   - 智能体 并入 多媒体（hotspots）
- *   - 'ai' / 'agents' 旧入口仍保留路由，用于 deep-link / 全局搜索兼容
+ *   - 全网热点 与 智能体 收敛为统一情报流（hotspots → FeedCenter）
+ *   - 'ai' / 'agents' 旧入口仍保留路由，用于 deep-link / 全局搜索兼容，
+ *     其中 'agents' 直接进入情报流（不再切换到独立智能体 Tab）
  */
 export interface PageViewProps {
   page: PageKey
@@ -51,7 +52,7 @@ export default function PageView({ page, id, action }: PageViewProps) {
       return <KnowledgeBase />
     case 'agents':
     case 'hotspots':
-      return <Hotspots initialTab={page === 'agents' ? 'agents' : undefined} />
+      return <FeedCenter />
     case 'stickies':
       return <Stickies />
     case 'writing':

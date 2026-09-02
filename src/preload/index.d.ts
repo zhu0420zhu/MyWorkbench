@@ -36,6 +36,12 @@ import type {
   HotNotifierStatus,
   GzhConfigInfo,
   HotItem,
+  FeedItem,
+  FeedResult,
+  FeedSourceMeta,
+  FeedSourceConfig,
+  FeedNotifySettings,
+  FeedRunRecord,
   OrganizeAction,
   OrganizeOptions,
   OrganizePlanPreview,
@@ -613,6 +619,18 @@ export interface Api {
     notifierSet: (s: HotNotifySettings) => Promise<HotNotifySettings>
     notifierStatus: () => Promise<HotNotifierStatus>
     notifierCheck: () => Promise<{ notified: number; total: number }>
+  }
+  /* ---- feed：全网热点 × 智能体 统一情报流（与 index.ts 的 feed 块双写同步） ---- */
+  feed: {
+    result: () => Promise<FeedResult>
+    listSources: () => Promise<FeedSourceMeta[]>
+    runSource: (id: string) => Promise<FeedItem[]>
+    setSourceConfig: (id: string, c: FeedSourceConfig) => Promise<void>
+    history: (id: string) => Promise<FeedRunRecord[]>
+    notifyGet: () => Promise<FeedNotifySettings>
+    notifySet: (s: FeedNotifySettings) => Promise<FeedNotifySettings>
+    notifyCheck: () => Promise<{ notified: number; total: number }>
+    notifyStatus: () => Promise<HotNotifierStatus>
   }
   pickTextFile: () => Promise<{ name: string; content: string } | null>
   searchAll: (query: string) => Promise<SearchResult[]>
