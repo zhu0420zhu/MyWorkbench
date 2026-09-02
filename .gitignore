@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 out/
+build/
 release/
 
 # Logs
@@ -22,3 +23,21 @@ Thumbs.db
 # SQLite / runtime data (generated at runtime)
 *.db
 *.sqlite
+userData/
+
+# Generated temp config (electron-vite temp copies)
+electron.vite.config.*.mjs
+
+# Local tooling / caches
+.dl/
+.toolcache/
+.workbuddy/
+smoke_st/
+
+# Legacy / external assets (not part of lingmo-workbench source)
+ck/
+design/
+resources/
+
+# Root bundled artifact (generated, do not track)
+index.js

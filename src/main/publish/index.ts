@@ -1,0 +1,13 @@
+/* 多平台发布模块统一出口（P1） */
+export * from './adapter.ts'
+export * from './queue.ts'
+export * from './auth.ts'
+export { weiboAdapter } from './adapters/weibo.ts'
+export { zhihuAdapter } from './adapters/zhihu.ts'
+export { juejinAdapter } from './adapters/juejin.ts'
+export { bilibiliAdapter } from './adapters/bilibili.ts'
+export { gongzhonghaoAdapter } from './adapters/gongzhonghao.ts'
+export { csdnAdapter } from './adapters/csdn.ts'
+export * from './gzhCredential.ts'
+export { registerAdapters, initPublish } from './setup.ts'
+export * from './aiAssist.ts'

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>便利贴</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: background-color 0.2s ease;
+      }
+      #bar {
+        height: 30px;
+        flex-shrink: 0;
+        -webkit-app-region: drag;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px 0 8px;
+      }
+      .bar-btn {
+        width: 26px;
+        height: 22px;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+        color: rgba(0, 0, 0, 0.55);
+        -webkit-app-region: no-drag;
+      }
+      .bar-btn:hover {
+        background: rgba(0, 0, 0, 0.15);
+      }
+      #bar-left,
+      #bar-right {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      /* 「打开程序」为宽按钮，带图标 */
+      #open {
+        width: auto;
+        padding: 0 8px;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 600;
+      }
+      #open[hidden] {
+        display: none;
+      }
+      #body {
+        flex: 1;
+        padding: 0 12px 12px;
+        overflow: auto;
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      #title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        word-break: break-word;
+      }
+      #content {
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: rgba(0, 0, 0, 0.8);
+        transition: font-size 0.2s ease;
+      }
+      /* 展开大尺寸：内容区更宽松 */
+      body.expanded #title {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+      body.expanded #content {
+        font-size: 14.5px;
+        line-height: 1.75;
+      }
+      body.expanded #body {
+        padding: 0 16px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <div id="bar-left">
+        <button id="open" class="bar-btn" title="打开关联程序" hidden>▶ 打开程序</button>
+      </div>
+      <div id="bar-right">
+        <button id="expand" class="bar-btn" title="展开大尺寸">⤢</button>
+        <button id="close" class="bar-btn" title="关闭">✕</button>
+      </div>
+    </div>
+    <div id="body">
+      <div id="title"></div>
+      <div id="content"></div>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search)
+      const id = params.get('id')
+
+      // 紧凑 ⇄ 大尺寸（与主进程 setStickyWindowSize 的 min 200 保持一致）
+      const COMPACT_W = 280
+      const COMPACT_H = 320
+      const EXPANDED_W = 480
+      const EXPANDED_H = 560
+      let expanded = false
+      let currentNote = null
+
+      function render(note) {
+        if (!note) return
+        currentNote = note
+        document.title = note.title || '便利贴'
+        document.getElementById('title').textContent = note.title || ''
+        document.getElementById('content').textContent = note.content || ''
+        document.body.style.background = note.color || '#fff3b0'
+        // 有关联程序才显示「打开程序」按钮
+        const openBtn = document.getElementById('open')
+        openBtn.hidden = !(note.command && note.command.trim())
+      }
+
+      window.api.stickies.get(id).then((note) => render(note))
+
+      window.api.stickies.onStickyUpdate((note) => {
+        if (note && note.id === id) render(note)
+      })
+
+      document.getElementById('close').addEventListener('click', () => {
+        window.api.stickies.unstick(id)
+      })
+
+      // 展开大尺寸 / 恢复紧凑
+      document.getElementById('expand').addEventListener('click', () => {
+        expanded = !expanded
+        window.api.stickies.setSize(id, expanded ? EXPANDED_W : COMPACT_W, expanded ? EXPANDED_H : COMPACT_H)
+        document.body.classList.toggle('expanded', expanded)
+        document.getElementById('expand').textContent = expanded ? '⤡' : '⤢'
+        document.getElementById('expand').title = expanded ? '收起为紧凑' : '展开大尺寸'
+      })
+
+      // 打开关联程序（纯字符串命令，与 command:run 约定一致）
+      document.getElementById('open').addEventListener('click', () => {
+        if (currentNote && currentNote.command && currentNote.command.trim()) {
+          window.api.runCommand(currentNote.command)
+        }
+      })
+    </script>
+  </body>
+</html>

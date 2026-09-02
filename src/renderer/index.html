@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>灵墨工作台</title>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cdn.tldraw.com; font-src 'self' data: https://cdn.tldraw.com; worker-src 'self' blob:; connect-src 'self' ws://localhost:* http://localhost:* https://cdn.tldraw.com; frame-src 'self' http://localhost:* http://127.0.0.1:* https://* http://*"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
