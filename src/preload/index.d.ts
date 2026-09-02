@@ -26,16 +26,13 @@ import type {
   OcrImageInfo,
   StickyNote,
   StickyNoteInput,
-  HotFetchResult,
   PublishJobInfo,
   PublishStats,
   AiAssistResult,
   PublishPlatformInfo,
   PublishCreateInput,
-  HotNotifySettings,
   HotNotifierStatus,
   GzhConfigInfo,
-  HotItem,
   FeedItem,
   FeedResult,
   FeedSourceMeta,
@@ -59,11 +56,6 @@ import type {
   QaHistoryEntry,
   ClassificationMemoryEntry,
   QaPrefs,
-  AgentJobInfo,
-  AgentRunRecord,
-  AgentsConfig,
-  AgentRunResult,
-  AgentConfig,
   KnowledgeBuildInput,
   KnowledgeBuildOptions,
   KnowledgeBuildResult,
@@ -613,14 +605,7 @@ export interface Api {
     run: (text: string, source: string, target: string) => Promise<{ ok: boolean; value?: string; error?: string }>
     langs: () => Promise<Array<{ code: string; label: string }>>
   }
-  hot: {
-    fetch: () => Promise<HotFetchResult>
-    notifierGet: () => Promise<HotNotifySettings>
-    notifierSet: (s: HotNotifySettings) => Promise<HotNotifySettings>
-    notifierStatus: () => Promise<HotNotifierStatus>
-    notifierCheck: () => Promise<{ notified: number; total: number }>
-  }
-  /* ---- feed：全网热点 × 智能体 统一情报流（与 index.ts 的 feed 块双写同步） ---- */
+  /* ---- feed：全网热点 × 智能体 统一情报流（渲染层新入口） ---- */
   feed: {
     result: () => Promise<FeedResult>
     listSources: () => Promise<FeedSourceMeta[]>
@@ -746,13 +731,6 @@ export interface Api {
     qaHistoryClear: () => Promise<boolean>
     qaPrefsGet: () => Promise<QaPrefs>
     qaPrefsSet: (prefs: QaPrefs) => Promise<QaPrefs>
-  }
-  agents: {
-    list: () => Promise<AgentJobInfo[]>
-    history: (id: string) => Promise<AgentRunRecord[]>
-    runNow: (id: string) => Promise<AgentRunResult>
-    config: (patch: Partial<AgentsConfig>) => Promise<AgentsConfig>
-    jobConfig: (id: string, c: Partial<AgentConfig>) => Promise<AgentsConfig>
   }
   knowledgeBase: {
     build: (inputs: KnowledgeBuildInput[], opts?: KnowledgeBuildOptions) => Promise<KnowledgeBuildResult>

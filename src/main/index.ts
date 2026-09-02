@@ -36,9 +36,7 @@ import {
   getStickyPanelMode,
   type StickyPanelMode
 } from './stickyPanel'
-import { fetchAllHot } from './hot'
 import { translateText, TRANSLATE_LANGS } from './translate'
-import { loadNotifySettings, saveNotifySettings, getHotNotifierStatus, checkHotOnce } from './hotNotifier'
 import { readAiConfig, saveAiConfig, chat, stopChat, complete, testAiConnection } from './ai'
 import { dataInfo, backupData, importData, getDataDirSetting, setDataDirSetting, applyCustomDataDir, pickDir } from './data'
 import {
@@ -64,7 +62,6 @@ import { registerPublishIpc } from './publishIpc'
 import { registerOrganizeIpc } from './organize/organizeIpc'
 import { registerConvertIpc } from './convert/convertIpc'
 import { registerSearchIndexIpc } from './searchIndex/searchIndexIpc'
-import { registerAgentsIpc } from './agents/agentsIpc'
 import { registerKnowledgeBaseIpc } from './knowledgeBase/knowledgeBaseIpc'
 import { registerKbDataIpc } from './kbDataIpc'
 import { registerMcpIpc } from './mcp/mcpIpc'
@@ -445,8 +442,6 @@ function registerIpc(): void {
   ipcMain.handle('stickies:panel-mode', () => getStickyPanelMode())
   ipcMain.handle('stickies:panel-set-mode', (_e, m: StickyPanelMode) => setStickyPanelMode(m))
 
-  ipcMain.handle('hot:fetch', () => fetchAllHot())
-
   ipcMain.handle('translate:run', async (_e, text: string, source: string, target: string) => {
     try {
       return { ok: true, value: await translateText(text, source, target) }
@@ -568,10 +563,6 @@ function registerIpc(): void {
       return null
     }
   })
-  ipcMain.handle('hot:notifier-get', () => loadNotifySettings())
-  ipcMain.handle('hot:notifier-set', (_e, s) => saveNotifySettings(s))
-  ipcMain.handle('hot:notifier-status', () => getHotNotifierStatus())
-  ipcMain.handle('hot:notifier-check', () => checkHotOnce())
   ipcMain.handle('data:backup', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return null
@@ -611,7 +602,6 @@ app.whenReady().then(async () => {
   registerOrganizeIpc()
   registerConvertIpc()
   registerSearchIndexIpc()
-  registerAgentsIpc()
   registerFeedIpc()
   getFeedService().start()
   registerKnowledgeBaseIpc()

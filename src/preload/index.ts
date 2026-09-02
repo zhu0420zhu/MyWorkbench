@@ -27,16 +27,13 @@ import type {
   OcrImageInfo,
   StickyNote,
   StickyNoteInput,
-  HotFetchResult,
   PublishJobInfo,
   PublishStats,
   AiAssistResult,
   PublishPlatformInfo,
   PublishCreateInput,
-  HotNotifySettings,
   HotNotifierStatus,
   GzhConfigInfo,
-  HotItem,
   FeedItem,
   FeedResult,
   FeedSourceMeta,
@@ -60,11 +57,6 @@ import type {
   QaHistoryEntry,
   ClassificationMemoryEntry,
   QaPrefs,
-  AgentJobInfo,
-  AgentRunRecord,
-  AgentsConfig,
-  AgentRunResult,
-  AgentConfig,
   KnowledgeBuildInput,
   KnowledgeBuildOptions,
   KnowledgeBuildResult,
@@ -627,14 +619,7 @@ const api = {
       ipcRenderer.invoke('translate:run', text, source, target),
     langs: (): Promise<Array<{ code: string; label: string }>> => ipcRenderer.invoke('translate:langs')
   },
-  hot: {
-    fetch: (): Promise<HotFetchResult> => ipcRenderer.invoke('hot:fetch'),
-    notifierGet: (): Promise<HotNotifySettings> => ipcRenderer.invoke('hot:notifier-get'),
-    notifierSet: (s: HotNotifySettings): Promise<HotNotifySettings> => ipcRenderer.invoke('hot:notifier-set', s),
-    notifierStatus: (): Promise<HotNotifierStatus> => ipcRenderer.invoke('hot:notifier-status'),
-    notifierCheck: (): Promise<{ notified: number; total: number }> => ipcRenderer.invoke('hot:notifier-check')
-  },
-  /* ---- feed：全网热点 × 智能体 统一情报流（渲染层新入口，旧 hot/agents 保留待迁移） ---- */
+  /* ---- feed：全网热点 × 智能体 统一情报流（渲染层新入口） ---- */
   feed: {
     result: (): Promise<FeedResult> => ipcRenderer.invoke('feed:result'),
     listSources: (): Promise<FeedSourceMeta[]> => ipcRenderer.invoke('feed:list-sources'),
@@ -797,14 +782,6 @@ const api = {
     qaHistoryClear: (): Promise<boolean> => ipcRenderer.invoke('searchIndex:qa-history-clear'),
     qaPrefsGet: (): Promise<QaPrefs> => ipcRenderer.invoke('searchIndex:qa-prefs-get'),
     qaPrefsSet: (prefs: QaPrefs): Promise<QaPrefs> => ipcRenderer.invoke('searchIndex:qa-prefs-set', prefs)
-  },
-  agents: {
-    list: (): Promise<AgentJobInfo[]> => ipcRenderer.invoke('agents:list'),
-    history: (id: string): Promise<AgentRunRecord[]> => ipcRenderer.invoke('agents:history', id),
-    runNow: (id: string): Promise<AgentRunResult> => ipcRenderer.invoke('agents:run-now', id),
-    config: (patch: Partial<AgentsConfig>): Promise<AgentsConfig> => ipcRenderer.invoke('agents:config', patch),
-    jobConfig: (id: string, c: Partial<AgentConfig>): Promise<AgentsConfig> =>
-      ipcRenderer.invoke('agents:job-config', id, c)
   },
   knowledgeBase: {
     build: (inputs: KnowledgeBuildInput[], opts?: KnowledgeBuildOptions): Promise<KnowledgeBuildResult> =>
