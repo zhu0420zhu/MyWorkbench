@@ -19,7 +19,7 @@ const PAGES: NavEntry[] = [
   { page: 'analytics', title: '数据分析', keywords: 'analytics 图表 统计 csv echarts 可视化 数据 分析' },
   { page: 'boards', title: '白板', keywords: 'board 白板 画布 绘图' },
   { page: 'texttools', title: '文本工具', keywords: 'text 文本 批处理 ocr 翻译 智能工具' },
-  { page: 'hotspots', title: '多媒体', keywords: 'hot media 多媒体 热点 热点跟进 agent 智能体 代理 常驻 智能多媒体' },
+  { page: 'hotspots', title: '情报中心', keywords: 'hot media 多媒体 热点 热点跟进 agent 智能体 代理 常驻 智能多媒体 情报中心' },
   { page: 'settings', title: '设置', keywords: 'setting 设置 配置 偏好' },
   { page: 'writing', title: '写作', keywords: 'writing 写作 写稿 创作 编辑 笔记 文本 润色' },
   { page: 'copywriting', title: '文案', keywords: 'copy 文案 营销 推广 宣传 带货 小红书 公众号 热点分发' },

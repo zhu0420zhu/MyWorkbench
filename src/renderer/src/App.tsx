@@ -25,7 +25,7 @@ const { Sider, Content } = Layout
 
 /** 每个功能域一种主题色，作为分组色标，提升扫读效率 */
 const GROUP_ACCENT: Record<string, string> = {
-  '智能多媒体': '#378ADD',
+  '智能情报': '#378ADD',
   '内容创作': '#7F77DD',
   '智能工具': '#1D9E75',
   '系统': '#888780'
@@ -82,7 +82,7 @@ export default function App() {
       return { key, label: m?.label ?? key, icon: m?.icon, onClick: () => navigate({ page: key }) }
     }
     return [
-      { key: 'g-ai', label: '智能多媒体', accent: GROUP_ACCENT['智能多媒体'], children: [leaf('dashboard'), leaf('knowledge'), leaf('hotspots')] },
+      { key: 'g-ai', label: '智能情报', accent: GROUP_ACCENT['智能情报'], children: [leaf('dashboard'), leaf('knowledge'), leaf('hotspots')] },
       { key: 'g-content', label: '内容创作', accent: GROUP_ACCENT['内容创作'], children: [leaf('writing'), leaf('copywriting'), leaf('notes'), leaf('stickies'), leaf('boards'), leaf('gameui')] },
       { key: 'g-filedata', label: '智能工具', accent: GROUP_ACCENT['智能工具'], children: [leaf('filetools'), leaf('texttools'), leaf('database'), leaf('analytics')] },
       { key: 'g-system', label: '系统', accent: GROUP_ACCENT['系统'], children: [leaf('settings')] }

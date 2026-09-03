@@ -479,7 +479,7 @@ export default function Settings() {
                   { label: '数据整理', value: 'database' },
                   { label: '数据分析', value: 'analytics' },
                   { label: '白板', value: 'boards' },
-                  { label: '多媒体', value: 'hotspots' },
+                  { label: '情报中心', value: 'hotspots' },
                   { label: '设置', value: 'settings' }
                 ]}
               />

@@ -27,7 +27,7 @@ const PAGE_TITLES: Record<string, string> = {
   knowledge: '本地知识库',
   agents: '智能体',
   stickies: '便利贴',
-  hotspots: '多媒体',
+  hotspots: '情报中心',
   writing: '写作',
   copywriting: '文案',
   gameui: '游戏UI设计',

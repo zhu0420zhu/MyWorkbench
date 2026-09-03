@@ -181,7 +181,7 @@ export default function FeedCenter() {
       <div className="page-header">
         <Typography.Title level={4} style={{ margin: 0 }}>
           <FireOutlined style={{ color: '#fa541c', marginRight: 8 }} />
-          多媒体 · 情报流
+          情报中心 · 情报流
         </Typography.Title>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {updatedAt && (

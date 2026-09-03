@@ -39,7 +39,7 @@ export const NAV: NavMeta[] = [
   { key: 'gameui', icon: <AppstoreOutlined />, label: '游戏UI设计' },
   { key: 'database', icon: <DatabaseOutlined />, label: '数据整理' },
   { key: 'boards', icon: <BgColorsOutlined />, label: '白板' },
-  { key: 'hotspots', icon: <FireOutlined />, label: '多媒体' },
+  { key: 'hotspots', icon: <FireOutlined />, label: '情报中心' },
   { key: 'settings', icon: <SettingOutlined />, label: '设置' },
   { key: 'analytics', icon: <BarChartOutlined />, label: '数据分析' }
 ]
