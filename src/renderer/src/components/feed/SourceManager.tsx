@@ -3,8 +3,12 @@ import {
   Button,
   Drawer,
   Empty,
+  Form,
+  Input,
   InputNumber,
   List,
+  Modal,
+  Select,
   Space,
   Switch,
   Table,
@@ -12,7 +16,7 @@ import {
   Typography,
   message
 } from 'antd'
-import { LinkOutlined, PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, LinkOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { hoursToMs, isValidHttpUrl, msToHours } from './feedUtils'
 import type { FeedItem, FeedRunRecord, FeedSourceMeta } from '@shared/types'
 
@@ -48,6 +52,8 @@ export default function SourceManager({ open, onClose, onChanged }: SourceManage
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
   const [history, setHistory] = useState<Record<string, FeedRunRecord[]>>({})
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
+  const [addOpen, setAddOpen] = useState(false)
+  const [addForm] = Form.useForm()
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -119,6 +125,56 @@ export default function SourceManager({ open, onClose, onChanged }: SourceManage
     else message.error('链接无效，无法打开')
   }
 
+  const handleAdd = async (values: {
+    id: string
+    name: string
+    kind: 'hot' | 'agent'
+    url: string
+    description?: string
+    defaultCategory?: string
+    intervalHours?: number
+  }): Promise<void> => {
+    try {
+      await window.api.feed.addSource({
+        id: values.id.trim(),
+        name: values.name.trim(),
+        kind: values.kind,
+        description: values.description?.trim(),
+        defaultCategory: values.defaultCategory?.trim() || undefined,
+        enabled: true,
+        intervalMs: values.kind === 'hot' ? 0 : Math.max(1, values.intervalHours ?? 1) * 3600_000,
+        url: values.url.trim()
+      })
+      message.success('数据源已添加')
+      addForm.resetFields()
+      setAddOpen(false)
+      await load()
+      onChanged?.()
+    } catch (err) {
+      message.error(`添加失败：${(err as Error).message}`)
+    }
+  }
+
+  const handleRemove = (src: FeedSourceMeta): void => {
+    Modal.confirm({
+      title: '删除数据源',
+      content: `确定删除「${src.name}」吗？该数据源的历史记录与周期任务将一并移除。`,
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await window.api.feed.removeSource(src.id)
+          message.success('已删除')
+          await load()
+          onChanged?.()
+        } catch (err) {
+          message.error(`删除失败：${(err as Error).message}`)
+        }
+      }
+    })
+  }
+
   const okCount = sources.filter((s) => s.lastStatus === 'ok').length
   const hotCount = sources.filter((s) => s.kind === 'hot').length
   const agentCount = sources.filter((s) => s.kind === 'agent').length
@@ -130,14 +186,23 @@ export default function SourceManager({ open, onClose, onChanged }: SourceManage
       onClose={onClose}
       width={900}
       extra={
-        <Button
-          size="small"
-          icon={<ReloadOutlined />}
-          loading={loading}
-          onClick={() => void load()}
-        >
-          刷新
-        </Button>
+        <Space>
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => setAddOpen(true)}
+          >
+            添加数据源
+          </Button>
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => void load()}
+          >
+            刷新
+          </Button>
+        </Space>
       }
     >
       <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
@@ -311,22 +376,93 @@ export default function SourceManager({ open, onClose, onChanged }: SourceManage
             },
             {
               title: '操作',
-              width: 120,
+              width: 170,
               render: (_v, record) => (
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<PlayCircleOutlined />}
-                  loading={runningIds.has(record.id)}
-                  onClick={() => void runNow(record)}
-                >
-                  立即运行
-                </Button>
+                <Space>
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<PlayCircleOutlined />}
+                    loading={runningIds.has(record.id)}
+                    onClick={() => void runNow(record)}
+                  >
+                    立即运行
+                  </Button>
+                  {!record.builtIn && (
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      title="删除"
+                      onClick={() => handleRemove(record)}
+                    >
+                      删除
+                    </Button>
+                  )}
+                </Space>
               )
             }
           ]}
         />
       )}
+
+      <Modal
+        title="添加数据源"
+        open={addOpen}
+        onCancel={() => {
+          setAddOpen(false)
+          addForm.resetFields()
+        }}
+        onOk={() => addForm.submit()}
+        width={520}
+      >
+        <Form form={addForm} layout="vertical" onFinish={handleAdd}>
+          <Form.Item
+            name="id"
+            label="ID"
+            rules={[{ required: true, message: '请输入数据源 ID' }]}
+          >
+            <Input placeholder="如 my-rss" />
+          </Form.Item>
+          <Form.Item
+            name="name"
+            label="名称"
+            rules={[{ required: true, message: '请输入数据源名称' }]}
+          >
+            <Input placeholder="如 我的 RSS" />
+          </Form.Item>
+          <Form.Item name="kind" label="类型" initialValue="agent" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: '智能体（按周期拉取）', value: 'agent' },
+                { label: '热点（实时聚合）', value: 'hot' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name="url"
+            label="JSON Feed URL"
+            rules={[{ required: true, message: '请输入 JSON feed 地址' }]}
+            extra="期望返回 [{ title, url, hot? }] 或 { items: [...] }"
+          >
+            <Input placeholder="https://example.com/feed.json" />
+          </Form.Item>
+          <Form.Item name="description" label="说明">
+            <Input.TextArea rows={2} placeholder="可选说明" />
+          </Form.Item>
+          <Form.Item name="defaultCategory" label="默认分类">
+            <Input placeholder="如 科技" />
+          </Form.Item>
+          <Form.Item
+            name="intervalHours"
+            label="周期（小时）"
+            initialValue={6}
+            rules={[{ required: true }]}
+          >
+            <InputNumber min={1} style={{ width: 120 }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Drawer>
   )
 }

@@ -9,9 +9,10 @@ import {
   getAllDisks,
   DiskAnalyzer,
   findDuplicates,
-  getFileWatcher
+  getFileWatcher,
+  compareFolders
 } from './tools/index.ts'
-import type { ScanOptions, DuplicateScanOptions } from './tools/index.ts'
+import type { ScanOptions, DuplicateScanOptions, FolderCompareOptions } from './tools/index.ts'
 
 export function registerToolsIpc(): void {
   const analyzer = new DiskAnalyzer()
@@ -37,6 +38,12 @@ export function registerToolsIpc(): void {
   // ---- 重复检测 ----
   ipcMain.handle('tools:find-duplicates', (_e, dir: string, opts?: DuplicateScanOptions & { strategy?: string }) =>
     findDuplicates(dir, opts)
+  )
+
+  // ---- 目录对比 ----
+  ipcMain.handle(
+    'tools:compare-folders',
+    (_e, left: string, right: string, opts?: FolderCompareOptions) => compareFolders(left, right, opts)
   )
 
   // ---- 文件监控（事件推送到所有窗口）----

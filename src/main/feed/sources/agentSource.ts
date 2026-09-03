@@ -57,7 +57,8 @@ export function createAgentSources(sched: AgentScheduler): FeedSource[] {
       lastRunAt: null,
       lastStatus: 'idle',
       lastSummary: undefined,
-      lastItemCount: 0
+      lastItemCount: 0,
+      builtIn: true
     }
 
     function toItems(items: AgentResultItem[]): FeedItem[] {

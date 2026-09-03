@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Checkbox,
@@ -53,6 +53,40 @@ interface FieldFormValues {
   options?: string[]
 }
 
+interface SidebarItemProps {
+  t: TableMeta
+  activeId: string | null
+  onClick: (id: string) => void
+  onRemove: (id: string) => void
+}
+
+/** 侧边栏表项：memo 化，避免点击/编辑时整表列表重渲染 */
+const SidebarItem = memo(({ t, activeId, onClick, onRemove }: SidebarItemProps) => (
+  <List.Item
+    className={'automation-item' + (t.id === activeId ? ' active' : '')}
+    onClick={() => onClick(t.id)}
+  >
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="automation-item-name">{t.name}</div>
+      <div className="automation-item-cmd">
+        {t.fieldCount} 字段 · {t.rowCount} 行
+      </div>
+    </div>
+    <Button
+      type="text"
+      size="small"
+      danger
+      icon={<DeleteOutlined />}
+      title="删除表"
+      aria-label="删除表"
+      onClick={(e) => {
+        e.stopPropagation()
+        onRemove(t.id)
+      }}
+    />
+  </List.Item>
+))
+
 export default function DataLab() {
   const { isDark } = useTheme()
   const { prefs } = usePrefs()
@@ -85,6 +119,11 @@ export default function DataLab() {
 
   // 当前表（完整行）：切换表时按 id 取，列表只存摘要，避免大表整表跨进程传输
   const loadedIdRef = useRef<string | null>(null)
+  const activeRef = useRef<DataTable | null>(null)
+  useEffect(() => {
+    activeRef.current = active
+  }, [active])
+
   useEffect(() => {
     if (!activeId) {
       loadedIdRef.current = null
@@ -231,7 +270,7 @@ export default function DataLab() {
     }
   }
 
-  const handleRemove = async (id: string): Promise<void> => {
+  const handleRemove = useCallback(async (id: string): Promise<void> => {
     const t = tables.find((x) => x.id === id)
     Modal.confirm({
       title: '删除数据表',
@@ -250,10 +289,11 @@ export default function DataLab() {
         }
       }
     })
-  }
+  }, [tables, activeId])
 
-  const removeRow = (rowId: string): void => {
-    if (!active) return
+  const removeRow = useCallback((rowId: string): void => {
+    const cur = activeRef.current
+    if (!cur) return
     Modal.confirm({
       title: '删除数据行',
       content: '确定删除该行吗？此操作不可撤销。',
@@ -261,11 +301,11 @@ export default function DataLab() {
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        persist({ ...active, rows: active.rows.filter((r) => r.id !== rowId) })
+        persist({ ...cur, rows: cur.rows.filter((r) => r.id !== rowId) })
         message.success('已删除')
       }
     })
-  }
+  }, [])
 
   /* 表名重命名：乐观更新 + 400ms 防抖写盘 */
   const nameTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -459,8 +499,9 @@ export default function DataLab() {
       )
     })
     return cols
+    // removeRow 已用 activeRef 保持最新 active，因此列定义不再依赖 active 引用
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.fields, active, editing])
+  }, [active?.fields, editing, removeRow])
 
   /* ---------- 看板 ---------- */
   const groupField = active?.fields.find((f) => f.type === 'select') ?? null
@@ -589,25 +630,12 @@ export default function DataLab() {
             <List
               dataSource={tables}
               renderItem={(t) => (
-                <List.Item className={'automation-item' + (t.id === activeId ? ' active' : '')} onClick={() => setActiveId(t.id)}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="automation-item-name">{t.name}</div>
-                    <div className="automation-item-cmd">
-                      {t.fieldCount} 字段 · {t.rowCount} 行
-                    </div>
-                  </div>
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    aria-label="删除表"
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleRemove(t.id)
-                    }}
-                  />
-                </List.Item>
+                <SidebarItem
+                  t={t}
+                  activeId={activeId}
+                  onClick={setActiveId}
+                  onRemove={handleRemove}
+                />
               )}
             />
           )}

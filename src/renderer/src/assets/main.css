@@ -1139,20 +1139,19 @@ html[data-theme='dark'] .texttools-output mark {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 12px;
 }
 
 .analytics-chart {
-  flex: 1.2;
-  min-height: 280px;
+  flex-shrink: 0;
+  min-height: 200px;
   border: 1px solid;
   border-radius: 10px;
   padding: 8px;
 }
 
 .analytics-preview {
-  flex: 0.8;
-  min-height: 0;
+  flex-shrink: 0;
+  min-height: 160px;
   overflow: auto;
   border: 1px solid;
   border-radius: 10px;
@@ -1161,12 +1160,39 @@ html[data-theme='dark'] .texttools-output mark {
 
 /* 结论区：规则化结论列表 + 统计摘要表 + 导出 */
 .analytics-conclusions {
-  flex-shrink: 0;
-  max-height: 420px;
+  flex: 1;
+  min-height: 180px;
   overflow: auto;
   border: 1px solid;
   border-radius: 10px;
   padding: 10px 12px;
+}
+
+/* 可拖动分隔条 */
+.analytics-resize-handle {
+  flex-shrink: 0;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border-color, rgba(128, 128, 128, 0.25));
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  margin: 2px 0;
+}
+.analytics-resize-handle:hover {
+  background: var(--accent-color, #1677ff);
+}
+.analytics-resize-handle::before {
+  content: '';
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text-secondary, rgba(128, 128, 128, 0.5));
+}
+.analytics-resize-handle:hover::before {
+  background: #fff;
 }
 .analytics-conclusions-header {
   display: flex;

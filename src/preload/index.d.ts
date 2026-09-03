@@ -201,6 +201,41 @@ export interface DuplicateScanResult {
   strategy: string
   groups: DuplicateResultGroup[]
 }
+export interface FolderCompareDiffLine {
+  type: 'same' | 'added' | 'removed'
+  line: string
+  leftNo?: number
+  rightNo?: number
+}
+export interface FolderCompareFile {
+  relativePath: string
+  leftPath?: string
+  rightPath?: string
+  leftSize?: number
+  rightSize?: number
+  leftModified?: number
+  rightModified?: number
+  leftHash?: string
+  rightHash?: string
+  status: 'identical' | 'different' | 'only-left' | 'only-right'
+  diff?: FolderCompareDiffLine[]
+}
+export interface FolderCompareResult {
+  left: string
+  right: string
+  onlyInLeft: FolderCompareFile[]
+  onlyInRight: FolderCompareFile[]
+  different: FolderCompareFile[]
+  identical: FolderCompareFile[]
+  summary: {
+    totalLeft: number
+    totalRight: number
+    identical: number
+    different: number
+    onlyLeft: number
+    onlyRight: number
+  }
+}
 export interface WatchedDirInfo {
   name: string
   path: string
@@ -611,6 +646,8 @@ export interface Api {
     listSources: () => Promise<FeedSourceMeta[]>
     runSource: (id: string) => Promise<FeedItem[]>
     setSourceConfig: (id: string, c: FeedSourceConfig) => Promise<void>
+    addSource: (def: CustomFeedSourceDef) => Promise<FeedSourceMeta>
+    removeSource: (id: string) => Promise<void>
     history: (id: string) => Promise<FeedRunRecord[]>
     notifyGet: () => Promise<FeedNotifySettings>
     notifySet: (s: FeedNotifySettings) => Promise<FeedNotifySettings>
@@ -675,6 +712,7 @@ export interface Api {
     analyzeDirectory: (dir: string, recursive?: boolean, minSizeLarge?: number) => Promise<DirectoryAnalysis>
     findLargeFiles: (dir: string, minSize?: number, limit?: number) => Promise<LargeFile[]>
     findDuplicates: (dir: string, opts?: ScanOptions & { strategy?: string }) => Promise<DuplicateScanResult>
+    compareFolders: (left: string, right: string, opts?: { hash?: boolean; diffText?: boolean; maxDiffLines?: number }) => Promise<FolderCompareResult>
     watcher: {
       add: (dir: string, name?: string) => Promise<boolean>
       remove: (dir: string) => Promise<boolean>

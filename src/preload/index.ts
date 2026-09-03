@@ -40,6 +40,7 @@ import type {
   FeedSourceConfig,
   FeedNotifySettings,
   FeedRunRecord,
+  CustomFeedSourceDef,
   OrganizeAction,
   OrganizeOptions,
   OrganizePlanPreview,
@@ -626,6 +627,9 @@ const api = {
     runSource: (id: string): Promise<FeedItem[]> => ipcRenderer.invoke('feed:run-source', id),
     setSourceConfig: (id: string, c: FeedSourceConfig): Promise<void> =>
       ipcRenderer.invoke('feed:set-source-config', id, c),
+    addSource: (def: CustomFeedSourceDef): Promise<FeedSourceMeta> =>
+      ipcRenderer.invoke('feed:add-source', def),
+    removeSource: (id: string): Promise<void> => ipcRenderer.invoke('feed:remove-source', id),
     history: (id: string): Promise<FeedRunRecord[]> => ipcRenderer.invoke('feed:history', id),
     notifyGet: (): Promise<FeedNotifySettings> => ipcRenderer.invoke('feed:notify-get'),
     notifySet: (s: FeedNotifySettings): Promise<FeedNotifySettings> =>
@@ -715,6 +719,8 @@ const api = {
       ipcRenderer.invoke('tools:find-large-files', dir, minSize, limit),
     findDuplicates: (dir: string, opts?: unknown): Promise<unknown> =>
       ipcRenderer.invoke('tools:find-duplicates', dir, opts),
+    compareFolders: (left: string, right: string, opts?: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('tools:compare-folders', left, right, opts),
     watcher: {
       add: (dir: string, name?: string): Promise<boolean> => ipcRenderer.invoke('tools:watcher-add', dir, name),
       remove: (dir: string): Promise<boolean> => ipcRenderer.invoke('tools:watcher-remove', dir),

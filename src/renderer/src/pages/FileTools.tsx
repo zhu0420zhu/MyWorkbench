@@ -16,7 +16,8 @@ import {
   Alert,
   Collapse,
   Card,
-  Modal
+  Modal,
+  Segmented
 } from 'antd'
 import {
   FolderOpenOutlined,
@@ -29,6 +30,13 @@ import {
   PartitionOutlined,
   SwapOutlined
 } from '@ant-design/icons'
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(2)} KB`
+  return `${bytes} B`
+}
 
 /* 类型别名：直接取自 window.api.tools 的全局声明（避免引入 preload 模块） */
 type Disks = Awaited<ReturnType<typeof window.api.tools.getAllDisks>>
@@ -790,6 +798,212 @@ function ConvertSection() {
   )
 }
 
+/* ---------- 目录对比 ---------- */
+type CompareResult = Awaited<ReturnType<typeof window.api.tools.compareFolders>>
+type CompareFile = CompareResult['different'][number]
+
+function CompareSection() {
+  const [left, setLeft] = useState('')
+  const [right, setRight] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<CompareResult | null>(null)
+  const [filter, setFilter] = useState<'all' | 'only-left' | 'only-right' | 'different' | 'identical'>('all')
+  const [diffFile, setDiffFile] = useState<CompareFile | null>(null)
+
+  const pickDir = async (side: 'left' | 'right'): Promise<void> => {
+    const dir = await window.api.data.pickDir(`选择${side === 'left' ? '左侧' : '右侧'}目录`)
+    if (dir) {
+      if (side === 'left') setLeft(dir)
+      else setRight(dir)
+    }
+  }
+
+  const run = async (): Promise<void> => {
+    if (!left.trim() || !right.trim()) {
+      message.warning('请选择左右两个目录')
+      return
+    }
+    setLoading(true)
+    try {
+      const r = await window.api.tools.compareFolders(left.trim(), right.trim(), {
+        hash: true,
+        diffText: true
+      })
+      setResult(r)
+    } catch (err) {
+      message.error(`对比失败：${(err as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const allFiles = useMemo(() => {
+    if (!result) return []
+    return [
+      ...result.onlyInLeft.map((f) => ({ ...f, category: 'only-left' as const })),
+      ...result.onlyInRight.map((f) => ({ ...f, category: 'only-right' as const })),
+      ...result.different.map((f) => ({ ...f, category: 'different' as const })),
+      ...result.identical.map((f) => ({ ...f, category: 'identical' as const }))
+    ]
+  }, [result])
+
+  const filtered = useMemo(
+    () => (filter === 'all' ? allFiles : allFiles.filter((f) => f.category === filter)),
+    [allFiles, filter]
+  )
+
+  const statusTag = (status: CompareFile['status']) => {
+    const map: Record<CompareFile['status'], { color: string; label: string }> = {
+      'only-left': { color: 'orange', label: '仅左侧' },
+      'only-right': { color: 'cyan', label: '仅右侧' },
+      different: { color: 'red', label: '内容不同' },
+      identical: { color: 'green', label: '完全相同' }
+    }
+    return <Tag color={map[status].color}>{map[status].label}</Tag>
+  }
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Space wrap>
+        <Input
+          aria-label="左侧目录"
+          size="small"
+          placeholder="左侧目录"
+          value={left}
+          onChange={(e) => setLeft(e.target.value)}
+          style={{ width: 260 }}
+        />
+        <Button size="small" icon={<FolderOpenOutlined />} onClick={() => void pickDir('left')}>
+          选择左侧
+        </Button>
+        <SwapOutlined style={{ color: 'var(--text-secondary)' }} />
+        <Input
+          aria-label="右侧目录"
+          size="small"
+          placeholder="右侧目录"
+          value={right}
+          onChange={(e) => setRight(e.target.value)}
+          style={{ width: 260 }}
+        />
+        <Button size="small" icon={<FolderOpenOutlined />} onClick={() => void pickDir('right')}>
+          选择右侧
+        </Button>
+        <Button type="primary" size="small" icon={<FileSearchOutlined />} loading={loading} onClick={run}>
+          对比目录
+        </Button>
+      </Space>
+
+      {result && (
+        <>
+          <Space wrap>
+            <Tag>左 {result.summary.totalLeft} 个文件</Tag>
+            <Tag>右 {result.summary.totalRight} 个文件</Tag>
+            <Tag color="green">相同 {result.summary.identical}</Tag>
+            <Tag color="red">不同 {result.summary.different}</Tag>
+            <Tag color="orange">仅左 {result.summary.onlyLeft}</Tag>
+            <Tag color="cyan">仅右 {result.summary.onlyRight}</Tag>
+          </Space>
+          <Segmented
+            size="small"
+            value={filter}
+            onChange={(v) => setFilter(v as typeof filter)}
+            options={[
+              { label: `全部 (${allFiles.length})`, value: 'all' },
+              { label: `仅左侧 (${result.summary.onlyLeft})`, value: 'only-left' },
+              { label: `仅右侧 (${result.summary.onlyRight})`, value: 'only-right' },
+              { label: `内容不同 (${result.summary.different})`, value: 'different' },
+              { label: `完全相同 (${result.summary.identical})`, value: 'identical' }
+            ]}
+          />
+          <Table
+            size="small"
+            rowKey="relativePath"
+            dataSource={filtered}
+            pagination={{ pageSize: 20 }}
+            scroll={{ x: 'max-content' }}
+            columns={[
+              { title: '相对路径', dataIndex: 'relativePath', ellipsis: true },
+              { title: '状态', width: 100, render: (_v, r: CompareFile) => statusTag(r.status) },
+              {
+                title: '左侧大小',
+                width: 110,
+                render: (_v, r: CompareFile) =>
+                  r.leftSize !== undefined ? formatBytes(r.leftSize) : '-'
+              },
+              {
+                title: '右侧大小',
+                width: 110,
+                render: (_v, r: CompareFile) =>
+                  r.rightSize !== undefined ? formatBytes(r.rightSize) : '-'
+              },
+              {
+                title: '操作',
+                width: 110,
+                render: (_v, r: CompareFile) =>
+                  r.status === 'different' ? (
+                    <Button size="small" onClick={() => setDiffFile(r)}>
+                      查看差异
+                    </Button>
+                  ) : null
+              }
+            ]}
+          />
+        </>
+      )}
+
+      <Modal
+        title={`差异：${diffFile?.relativePath ?? ''}`}
+        open={diffFile !== null}
+        onCancel={() => setDiffFile(null)}
+        width={900}
+        footer={null}
+      >
+        {diffFile?.diff && diffFile.diff.length > 0 ? (
+          <div
+            style={{
+              maxHeight: 520,
+              overflow: 'auto',
+              fontFamily: 'monospace',
+              fontSize: 12,
+              background: 'var(--bg-subtle, rgba(0,0,0,.03))',
+              borderRadius: 8,
+              padding: 8
+            }}
+          >
+            {diffFile.diff.map((line, i) => (
+              <div
+                key={i}
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  color:
+                    line.type === 'added'
+                      ? '#389e0d'
+                      : line.type === 'removed'
+                        ? '#cf1322'
+                        : 'var(--text-primary)',
+                  background:
+                    line.type === 'added'
+                      ? 'rgba(82,196,26,.12)'
+                      : line.type === 'removed'
+                        ? 'rgba(255,77,79,.12)'
+                        : 'transparent',
+                  padding: '1px 4px',
+                  borderRadius: 2
+                }}
+              >
+                {line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '  '}
+                {line.line}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty description="无可读文本差异（可能为二进制文件或内容未采集）" />
+        )}
+      </Modal>
+    </Space>
+  )
+}
+
 /* ---------- 页面 ---------- */
 export default function FileTools() {
   return (
@@ -808,6 +1022,7 @@ export default function FileTools() {
           { key: 'disk', label: '磁盘信息', children: <DiskSection /> },
           { key: 'analyze', label: '目录分析', children: <AnalyzeSection /> },
           { key: 'duplicate', label: '重复检测', children: <DuplicateSection /> },
+          { key: 'compare', label: '目录对比', children: <CompareSection /> },
           { key: 'watcher', label: '文件监控', children: <WatcherSection /> },
           { key: 'organize', label: '智能分类与整理', children: <OrganizeSection /> },
           { key: 'convert', label: '格式转换', children: <ConvertSection /> },

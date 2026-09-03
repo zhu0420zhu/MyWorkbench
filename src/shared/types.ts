@@ -1444,6 +1444,21 @@ export interface FeedSourceMeta {
   lastSummary?: string
   /** 单源最近一次产出的条目数 */
   lastItemCount: number
+  /** 是否为内置源（内置源不可删除） */
+  builtIn?: boolean
+}
+
+/** 自定义 feed 源定义（用于 addSource） */
+export interface CustomFeedSourceDef {
+  id: string
+  name: string
+  kind: 'hot' | 'agent'
+  description?: string
+  defaultCategory?: string
+  enabled: boolean
+  intervalMs: number
+  /** 自定义源的数据地址（JSON feed） */
+  url: string
 }
 
 export interface FeedSourceStatus {

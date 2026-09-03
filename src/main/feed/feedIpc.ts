@@ -14,7 +14,8 @@ import type {
   FeedSourceConfig,
   FeedResult,
   FeedRunRecord,
-  FeedNotifySettings
+  FeedNotifySettings,
+  CustomFeedSourceDef
 } from '../../shared/types.ts'
 
 export function registerFeedIpc(): void {
@@ -30,6 +31,13 @@ export function registerFeedIpc(): void {
     'feed:set-source-config',
     (_e, id: string, c: FeedSourceConfig): Promise<void> => s.setSourceConfig(id, c)
   )
+
+  ipcMain.handle(
+    'feed:add-source',
+    (_e, def: CustomFeedSourceDef): Promise<FeedSourceMeta> => s.addSource(def)
+  )
+
+  ipcMain.handle('feed:remove-source', (_e, id: string): Promise<void> => s.removeSource(id))
 
   ipcMain.handle('feed:history', (_e, id: string): Promise<FeedRunRecord[]> => s.historyOf(id))
 

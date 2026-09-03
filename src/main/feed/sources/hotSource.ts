@@ -78,7 +78,8 @@ export function createHotSources(): FeedSource[] {
         lastRunAt: cachedAllHot ? cachedAllHot.updatedAt : null,
         lastStatus,
         lastSummary: pf?.error,
-        lastItemCount: pf?.count ?? 0
+        lastItemCount: pf?.count ?? 0,
+        builtIn: true
       }
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Checkbox,
@@ -116,10 +116,64 @@ const STATS_COLUMNS: ColumnsType<ColumnStats> = [
   { title: '标准差', dataIndex: 'std', width: 88, align: 'right', render: (v: number, r) => (r.numeric ? v : '-') }
 ]
 
+/** 可拖动分隔条：支持横向（row-resize）/纵向（col-resize） */
+interface ResizeHandleProps {
+  onResize: (delta: number) => void
+  direction?: 'row' | 'col'
+}
+
+function ResizeHandle({ onResize, direction = 'row' }: ResizeHandleProps) {
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      let prev = direction === 'row' ? e.clientY : e.clientX
+      const onMove = (ev: MouseEvent) => {
+        const cur = direction === 'row' ? ev.clientY : ev.clientX
+        onResize(cur - prev)
+        prev = cur
+      }
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        document.body.style.cursor = ''
+      }
+      document.body.style.cursor = direction === 'row' ? 'row-resize' : 'col-resize'
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    },
+    [onResize, direction]
+  )
+
+  return (
+    <div
+      className={`analytics-resize-handle analytics-resize-handle-${direction}`}
+      onMouseDown={handleMouseDown}
+      title="拖动调整大小"
+    />
+  )
+}
+
 export default function Analytics() {
   const { isDark } = useTheme()
   const { prefs } = usePrefs()
   const accent = resolveAccent(prefs.colorPrimary, isDark)
+
+  // 分析页三个区域（图表 / 结论 / 预览）的可拖动高度
+  const [chartHeight, setChartHeight] = useState(() => {
+    try {
+      return Math.max(200, Math.min(600, Number(localStorage.getItem('analytics.chartHeight') ?? 320)))
+    } catch {
+      return 320
+    }
+  })
+  const [previewHeight, setPreviewHeight] = useState(() => {
+    try {
+      return Math.max(160, Math.min(500, Number(localStorage.getItem('analytics.previewHeight') ?? 240)))
+    } catch {
+      return 240
+    }
+  })
+
   const [sourceMode, setSourceMode] = useState<SourceMode>('csv')
   const [csvEncoding, setCsvEncoding] = useState(() => localStorage.getItem('analytics.importEncoding') || 'auto')
   const [csvText, setCsvText] = useState('')
@@ -590,6 +644,16 @@ export default function Analytics() {
     }
   }, [])
 
+  // 拖动调整图表/预览高度后：持久化 + 触发 ECharts 自适应
+  useEffect(() => {
+    localStorage.setItem('analytics.chartHeight', String(chartHeight))
+    chartInstance.current?.resize()
+  }, [chartHeight])
+
+  useEffect(() => {
+    localStorage.setItem('analytics.previewHeight', String(previewHeight))
+  }, [previewHeight])
+
   /* ---------- 导出分析结果（另存为） ---------- */
   const handleExport = async (kind: 'md' | 'png' | 'csv'): Promise<void> => {
     try {
@@ -1000,9 +1064,13 @@ export default function Analytics() {
       <div className="analytics-body">
         {parsed.columns.length > 0 ? (
           <>
-            <div className="analytics-chart" ref={chartRef} />
+            <div className="analytics-chart" ref={chartRef} style={{ height: chartHeight }} />
+            <ResizeHandle
+              onResize={(d) => setChartHeight((h) => Math.max(200, Math.min(600, h + d)))}
+            />
             {stats.length > 0 && parsed.rows.length > 0 && (
-              <div className="analytics-conclusions">
+              <>
+                <div className="analytics-conclusions">
                 <div className="analytics-conclusions-header">
                   <Space size={8} wrap>
                     <Typography.Text strong style={{ fontSize: 12 }}>
@@ -1121,8 +1189,12 @@ export default function Analytics() {
                   scroll={{ x: 'max-content' }}
                 />
               </div>
-            )}
-            <div className="analytics-preview">
+              <ResizeHandle
+                onResize={(d) => setPreviewHeight((h) => Math.max(160, Math.min(500, h + d)))}
+              />
+            </>
+          )}
+          <div className="analytics-preview" style={{ height: previewHeight }}>
               <Space align="center" style={{ marginBottom: 8 }}>
                 <Typography.Text strong style={{ fontSize: 12 }}>
                   数据预览（前

@@ -11,6 +11,7 @@ import { getAgentScheduler } from '../agents/index.ts'
 import { loadNotifySettings, saveNotifySettings } from '../hotNotifier.ts'
 import { createHotSources } from './sources/hotSource.ts'
 import { createAgentSources } from './sources/agentSource.ts'
+import { createCustomFeedSource } from './sources/customSource.ts'
 import { aggregateFeed } from './aggregator.ts'
 import { isJobDue } from '../agents/due.ts'
 import type { FeedSource } from './source.ts'
@@ -20,7 +21,8 @@ import type {
   FeedSourceConfig,
   FeedResult,
   FeedRunRecord,
-  FeedNotifySettings
+  FeedNotifySettings,
+  CustomFeedSourceDef
 } from '../../shared/types.ts'
 
 const logger = getLogger('feed')
@@ -37,9 +39,11 @@ const HISTORY_LIMIT = 30
 export class FeedService {
   private sources: Map<string, FeedSource>
   private cfg: ConfigStore<{ sources: Record<string, FeedSourceConfig> }>
+  private customCfg: ConfigStore<{ sources: CustomFeedSourceDef[] }>
   private history: ConfigStore<{ records: FeedRunRecord[] }>
   private notifySettings: ConfigStore<FeedNotifySettings>
   private timer: ReturnType<typeof setInterval> | null = null
+  private customLoaded = false
 
   constructor() {
     this.sources = new Map<string, FeedSource>()
@@ -48,12 +52,47 @@ export class FeedService {
     this.cfg = new ConfigStore<{ sources: Record<string, FeedSourceConfig> }>('feed-sources', {
       sources: {}
     })
+    this.customCfg = new ConfigStore<{ sources: CustomFeedSourceDef[] }>('feed-custom-sources', {
+      sources: []
+    })
     this.history = new ConfigStore<{ records: FeedRunRecord[] }>('feed-history', { records: [] })
     this.notifySettings = new ConfigStore<FeedNotifySettings>('feed-notify', DEFAULT_NOTIFY)
   }
 
+  private async loadCustomSources(): Promise<void> {
+    if (this.customLoaded) return
+    this.customLoaded = true
+    try {
+      const custom = await this.customCfg.get()
+      for (const def of custom.sources) {
+        if (!def?.id || this.sources.has(def.id)) continue
+        const source = createCustomFeedSource(def)
+        const anySource = source as unknown as { __def: CustomFeedSourceDef }
+        anySource.__def = { ...def }
+        this.sources.set(def.id, source)
+      }
+    } catch (err) {
+      logger.error(`加载自定义 feed 源失败: ${(err as Error).message}`)
+    }
+  }
+
+  private async saveCustomSources(): Promise<void> {
+    const defs: CustomFeedSourceDef[] = []
+    for (const s of this.sources.values()) {
+      const meta = s.getMeta()
+      if (meta.builtIn) continue
+      // 自定义源通过 source 上的内部 def 快照重建
+      const anySource = s as unknown as { __def?: CustomFeedSourceDef }
+      if (anySource.__def) {
+        defs.push(anySource.__def)
+      }
+    }
+    await this.customCfg.set({ sources: defs })
+  }
+
   /** 列出全部数据源元信息（合并 getMeta + 持久化的启用/周期覆盖） */
   async listSources(): Promise<FeedSourceMeta[]> {
+    await this.loadCustomSources()
     const cfg = await this.cfg.get()
     const out: FeedSourceMeta[] = []
     for (const s of this.sources.values()) {
@@ -72,8 +111,37 @@ export class FeedService {
     return this.sources.get(id)
   }
 
+  /** 添加自定义数据源 */
+  async addSource(def: CustomFeedSourceDef): Promise<FeedSourceMeta> {
+    await this.loadCustomSources()
+    if (!def.id || !def.name) throw new Error('数据源 id 与名称不能为空')
+    if (this.sources.has(def.id)) throw new Error(`数据源 ${def.id} 已存在`)
+    const source = createCustomFeedSource(def)
+    // 在 source 上挂载 def 快照，便于 saveCustomSources 序列化
+    const anySource = source as unknown as { __def: CustomFeedSourceDef }
+    anySource.__def = { ...def }
+    this.sources.set(def.id, source)
+    await this.saveCustomSources()
+    return source.getMeta()
+  }
+
+  /** 删除数据源；内置源不可删除 */
+  async removeSource(id: string): Promise<void> {
+    await this.loadCustomSources()
+    const s = this.sources.get(id)
+    if (!s) throw new Error(`数据源 ${id} 不存在`)
+    const meta = s.getMeta()
+    if (meta.builtIn) throw new Error('内置数据源不可删除')
+    this.sources.delete(id)
+    const cfg = await this.cfg.get()
+    delete cfg.sources[id]
+    await this.cfg.set(cfg)
+    await this.saveCustomSources()
+  }
+
   /** 立即运行某数据源，写入历史，返回本次产出 */
   async runSource(id: string): Promise<FeedItem[]> {
+    await this.loadCustomSources()
     const s = this.sources.get(id)
     if (!s) return []
     const items = await s.runNow()
@@ -94,6 +162,7 @@ export class FeedService {
   }
 
   async setSourceConfig(id: string, c: FeedSourceConfig): Promise<void> {
+    await this.loadCustomSources()
     const s = this.sources.get(id)
     if (!s) return
     s.setConfig(c)
@@ -109,6 +178,7 @@ export class FeedService {
 
   /** 合并后的信息流结果 */
   async result(): Promise<FeedResult> {
+    await this.loadCustomSources()
     return aggregateFeed([...this.sources.values()])
   }
 
@@ -147,6 +217,7 @@ export class FeedService {
   }
 
   private async tick(): Promise<void> {
+    await this.loadCustomSources()
     const cfg = await this.cfg.get()
     const now = Date.now()
     for (const s of this.sources.values()) {
