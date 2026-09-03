@@ -19,6 +19,7 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   BarChartOutlined,
   ClearOutlined,
+  DatabaseOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
@@ -57,7 +58,7 @@ import {
 import { useTheme, resolveAccent } from '../theme/theme'
 import { usePrefs } from '../prefs'
 
-type SourceMode = 'csv' | 'table'
+type SourceMode = 'csv' | 'table' | 'kb'
 type ChartType = 'line' | 'bar' | 'pie'
 type Aggregate = 'raw' | 'sum' | 'avg' | 'count'
 
@@ -140,6 +141,17 @@ export default function Analytics() {
   // P0：知识库数据表（数据型资产登记后落 userData/kb/tables/lingmo.db），与分析场景共享聚合引擎
   const [kbTables, setKbTables] = useState<TableMeta[]>([])
   const [selectedKbTableId, setSelectedKbTableId] = useState<string | null>(null)
+  const [selectedKbTable, setSelectedKbTable] = useState<DataTable | null>(null)
+  const [kbTableLoading, setKbTableLoading] = useState(false)
+
+  // 表模式 / 知识库表模式共用解析：按当前 sourceMode 选数据来源
+  const isTableMode = sourceMode === 'table'
+  const isKbMode = sourceMode === 'kb'
+  const curTable = isKbMode ? selectedKbTable : selectedTable
+  const curTableId = isKbMode ? selectedKbTableId : selectedTableId
+  const curTables = isKbMode ? kbTables : tables
+  const curSetTableId = isKbMode ? setSelectedKbTableId : setSelectedTableId
+  const curApi = isKbMode ? window.api.kbData : window.api.tables
   const [tableLoading, setTableLoading] = useState(false)
   // 表模式：列选择与聚合一律用 fieldId（字段可重名，聚合契约只认 id）
   const [xFieldId, setXFieldId] = useState<string | null>(null)
@@ -210,6 +222,39 @@ export default function Analytics() {
       cancelled = true
     }
   }, [selectedTableId])
+
+  // 加载知识库表
+  useEffect(() => {
+    window.api.kbData
+      .listTables()
+      .then(setKbTables)
+      .catch(() => undefined)
+  }, [])
+
+  // 选中知识库表后按 id 取完整表（列表只返回摘要，不含行；用于字段选择器 + 预览 + 统计）
+  useEffect(() => {
+    if (!selectedKbTableId) {
+      setSelectedKbTable(null)
+      setKbTableLoading(false)
+      return
+    }
+    let cancelled = false
+    setKbTableLoading(true)
+    window.api.kbData
+      .getTable(selectedKbTableId)
+      .then((t) => {
+        if (!cancelled) setSelectedKbTable(t)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedKbTable(null)
+      })
+      .finally(() => {
+        if (!cancelled) setKbTableLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedKbTableId])
 
   const handleImportFile = async (): Promise<void> => {
     try {
@@ -282,12 +327,12 @@ export default function Analytics() {
       })
       .map((f) => f.name)
     return { columns, rows, numericColumns }
-  }, [sourceMode, csvText, csvFile, selectedTable])
+  }, [sourceMode, csvText, csvFile, curTable])
 
   const xName =
-    sourceMode === 'table' ? selectedTable?.fields.find((f) => f.id === xFieldId)?.name ?? null : xCol
+    isTableMode || isKbMode ? curTable?.fields.find((f) => f.id === xFieldId)?.name ?? null : xCol
   const yName =
-    sourceMode === 'table' ? selectedTable?.fields.find((f) => f.id === yFieldId)?.name ?? null : yCol
+    isTableMode || isKbMode ? curTable?.fields.find((f) => f.id === yFieldId)?.name ?? null : yCol
 
   // 默认列选择：切换数据源后旧列名失效时自动重置
   useEffect(() => {
@@ -309,8 +354,8 @@ export default function Analytics() {
 
   // 表模式：表加载完成后默认选前两个字段（优先数值字段作为 Y）
   useEffect(() => {
-    if (sourceMode !== 'table') return
-    const t = selectedTable
+    if (!isTableMode && !isKbMode) return
+    const t = curTable
     if (!t || t.fields.length === 0) {
       setXFieldId(null)
       setYFieldId(null)
@@ -330,7 +375,7 @@ export default function Analytics() {
   // 表模式聚合通道：图表数据走主进程 SQL 聚合（GROUP BY + LIMIT，载荷 ≤ topN），
   // 与全表读取（预览/统计）解耦——切换 X/Y/聚合/类目上限/筛选只发一条轻量 IPC。
   useEffect(() => {
-    if (sourceMode !== 'table' || !selectedTableId || !xFieldId) {
+    if ((!isTableMode && !isKbMode) || !curTableId || !xFieldId) {
       setAggResult(null)
       return
     }
@@ -342,16 +387,16 @@ export default function Analytics() {
     setAggResult(null)
     setAggLoading(true)
     const aggFilters: AggregateFilter[] | undefined =
-      filters.length > 0 && selectedTable
+      filters.length > 0 && curTable
         ? filters.map((f) => ({
-            fieldId: selectedTable.fields.find((ff) => ff.name === f.column)?.id ?? f.column,
+            fieldId: curTable.fields.find((ff) => ff.name === f.column)?.id ?? f.column,
             op: f.op,
             value: f.value
           }))
         : undefined
-    window.api.tables
+    curApi
       .aggregate({
-        tableId: selectedTableId,
+        tableId: curTableId,
         xFieldId,
         yFieldId: aggregate === 'count' ? null : yFieldId,
         agg: aggregate,
@@ -374,12 +419,12 @@ export default function Analytics() {
     return () => {
       cancelled = true
     }
-  }, [sourceMode, selectedTableId, xFieldId, yFieldId, aggregate, catLimit, previewCount, filters, selectedTable])
+  }, [sourceMode, curTableId, xFieldId, yFieldId, aggregate, catLimit, previewCount, filters, curTable, isKbMode])
 
   // 多维图表模型：CSV 模式在渲染层构建（含筛选/分组/排序/日期分桶）；
   // 数据库表模式用 SQL 聚合分组，仅支持排序/堆叠等渲染期变换（分组/日期分桶需原始行，表模式禁用）。
   const model: ChartModel = useMemo(() => {
-    if (sourceMode === 'table') {
+    if (isTableMode || isKbMode) {
       if (!aggResult) return { categories: [], series: [], isGrouped: false }
       return chartModelFromGroups(aggResult.groups, sortDir, catLimit)
     }
@@ -461,7 +506,7 @@ export default function Analytics() {
     if (model.categories.length === 0) {
       chart.clear()
       const hasAxes =
-        sourceMode === 'table'
+        isTableMode || isKbMode
           ? Boolean(xFieldId && (aggregate === 'count' || yFieldId))
           : Boolean(xCol && (aggregate === 'count' || yCol))
       const hint = aggLoading
@@ -593,7 +638,7 @@ export default function Analytics() {
   const filterColumnOptions =
     sourceMode === 'csv'
       ? parsed.columns.map((c) => ({ label: c, value: c }))
-      : selectedTable?.fields.map((f) => ({ label: f.name, value: f.name })) ?? []
+      : (isKbMode ? selectedKbTable?.fields : selectedTable?.fields)?.map((f) => ({ label: f.name, value: f.name })) ?? []
 
   return (
     <div className="analytics-page">
@@ -606,7 +651,8 @@ export default function Analytics() {
           onChange={(v) => setSourceMode(v as SourceMode)}
           options={[
             { label: 'CSV 数据', value: 'csv', icon: <FileExcelOutlined /> },
-            { label: '数据库表', value: 'table', icon: <BarChartOutlined /> }
+            { label: '数据库表', value: 'table', icon: <BarChartOutlined /> },
+            { label: '知识库表', value: 'kb', icon: <DatabaseOutlined /> }
           ]}
         />
       </div>
@@ -662,13 +708,13 @@ export default function Analytics() {
           </>
         ) : (
           <Select
-            aria-label="选择数据库表"
-            placeholder="选择数据库表"
+            aria-label={isKbMode ? '选择知识库表' : '选择数据库表'}
+            placeholder={isKbMode ? '选择知识库表' : '选择数据库表'}
             style={{ width: 320 }}
-            value={selectedTableId ?? undefined}
-            onChange={setSelectedTableId}
-            options={tables.map((t) => ({ label: `${t.name}（${t.rowCount} 行）`, value: t.id }))}
-            loading={tableLoading}
+            value={curTableId ?? undefined}
+            onChange={curSetTableId}
+            options={curTables.map((t) => ({ label: `${t.name}（${t.rowCount} 行）`, value: t.id }))}
+            loading={isKbMode ? kbTableLoading : tableLoading}
             showSearch
             optionFilterProp="label"
           />
@@ -682,14 +728,14 @@ export default function Analytics() {
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 X 轴：
               </Typography.Text>
-              {sourceMode === 'table' ? (
+              {isTableMode || isKbMode ? (
                 <Select
                   aria-label="X 轴字段"
                   size="small"
                   style={{ width: 150 }}
                   value={xFieldId ?? undefined}
                   onChange={setXFieldId}
-                  options={selectedTable?.fields.map((f) => ({ label: f.name, value: f.id })) ?? []}
+                  options={curTable?.fields.map((f) => ({ label: f.name, value: f.id })) ?? []}
                 />
               ) : (
                 <Select
@@ -714,7 +760,7 @@ export default function Analytics() {
                   value={yFieldId ?? undefined}
                   onChange={setYFieldId}
                   disabled={aggregate === 'count'}
-                  options={selectedTable?.fields.map((f) => ({ label: f.name, value: f.id })) ?? []}
+                  options={curTable?.fields.map((f) => ({ label: f.name, value: f.id })) ?? []}
                 />
               ) : (
                 <Select
@@ -867,8 +913,8 @@ export default function Analytics() {
                           style={{ width: 150 }}
                           value={colorBy ?? undefined}
                           onChange={(v) => setColorBy(v ?? null)}
-                          disabled={sourceMode === 'table'}
-                          placeholder={sourceMode === 'table' ? '表模式需原始行' : '选择分组列'}
+                          disabled={isTableMode || isKbMode}
+                          placeholder={isTableMode || isKbMode ? '表/知识库模式需原始行' : '选择分组列'}
                           options={
                             sourceMode === 'csv'
                               ? parsed.columns.filter((c) => c !== xCol).map((c) => ({ label: c, value: c }))
@@ -1109,7 +1155,7 @@ export default function Analytics() {
         ) : (
           <Empty
             style={{ marginTop: 60 }}
-            description={sourceMode === 'csv' ? '粘贴 CSV 数据开始分析' : '选择数据库表开始分析'}
+            description={sourceMode === 'csv' ? '粘贴 CSV 数据开始分析' : isKbMode ? '选择知识库表开始分析' : '选择数据库表开始分析'}
           />
         )}
       </div>
