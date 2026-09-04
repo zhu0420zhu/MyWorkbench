@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Button,
   Card,
+  ColorPicker,
   Descriptions,
   Form,
   Input,
@@ -9,6 +10,7 @@ import {
   Modal,
   Radio,
   Select,
+  Slider,
   Space,
   Table,
   Tag,
@@ -484,6 +486,51 @@ export default function Settings() {
                 ]}
               />
             </div>
+          </div>
+          <div>
+            <Typography.Text strong style={{ fontSize: 13 }}>
+              界面背景与透明度（仅浅色主题）
+            </Typography.Text>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+              <div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  表面背景色
+                </Typography.Text>
+                <div style={{ marginTop: 4 }}>
+                  <ColorPicker
+                    aria-label="表面背景色"
+                    value={prefs.surfaceBg}
+                    allowClear={false}
+                    onChange={(_, hex) => handleSavePrefs({ surfaceBg: hex })}
+                  />
+                </div>
+              </div>
+              <div style={{ minWidth: 240 }}>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  表面不透明度：{Math.round((prefs.surfaceOpacity ?? 1) * 100)}%
+                </Typography.Text>
+                <div style={{ marginTop: 4 }}>
+                  <Slider
+                    aria-label="表面不透明度"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={prefs.surfaceOpacity ?? 1}
+                    onChange={(v) => handleSavePrefs({ surfaceOpacity: v as number })}
+                  />
+                </div>
+              </div>
+              <Button
+                size="small"
+                onClick={() => handleSavePrefs({ surfaceBg: '#FDFBF5', surfaceOpacity: 1 })}
+              >
+                恢复默认
+              </Button>
+            </div>
+            <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+              背景色为 HEX（默认 #FDFBF5），不透明度取值范围 0–1（0=全透明，1=不透明，默认 1）。
+              仅作用于浅色主题，实时生效于菜单、对话框等浮层；变更立即保存并在当前窗口应用。
+            </Typography.Paragraph>
           </div>
         </div>
       </Card>

@@ -611,8 +611,11 @@ const api = {
       ipcRenderer.invoke('writing:save-draft', { title, content })
   },
   prefs: {
-    get: (): Promise<{ colorPrimary: string; defaultPage: string }> => ipcRenderer.invoke('prefs:get'),
-    set: (prefs: { colorPrimary: string; defaultPage: string }): Promise<{ colorPrimary: string; defaultPage: string }> =>
+    get: (): Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }> =>
+      ipcRenderer.invoke('prefs:get'),
+    set: (
+      prefs: { colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }
+    ): Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }> =>
       ipcRenderer.invoke('prefs:set', prefs)
   },
   translate: {

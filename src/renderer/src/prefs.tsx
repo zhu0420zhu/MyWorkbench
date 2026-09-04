@@ -4,9 +4,18 @@ import type { PageKey } from './nav'
 export interface Prefs {
   colorPrimary: string
   defaultPage: PageKey
+  /** 浅色主题下 UI 表面背景色（菜单 / 对话框等浮层），HEX 格式 */
+  surfaceBg: string
+  /** 浅色主题下 UI 表面不透明度，取值范围 0–1（0=全透明，1=不透明） */
+  surfaceOpacity: number
 }
 
-const DEFAULTS: Prefs = { colorPrimary: '#4f6ef7', defaultPage: 'dashboard' }
+const DEFAULTS: Prefs = {
+  colorPrimary: '#4f6ef7',
+  defaultPage: 'dashboard',
+  surfaceBg: '#FDFBF5',
+  surfaceOpacity: 1
+}
 
 interface PrefsContextValue {
   prefs: Prefs

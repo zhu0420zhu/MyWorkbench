@@ -56,3 +56,25 @@ export function resolveAccent(colorPrimary: string | undefined, isDark: boolean)
   if (c && c !== LEGACY_DEFAULT_PRIMARY) return colorPrimary as string
   return isDark ? DARK_PRIMARY : LIGHT_PRIMARY
 }
+
+/** 把 HEX 颜色与 0–1 透明度合成 rgba() 字符串；非法输入回落到默认 */
+export function hexToRgba(hex: string | undefined, alpha: number): string {
+  const a = Number.isFinite(alpha) ? Math.min(1, Math.max(0, alpha)) : 1
+  const h = (hex ?? '').trim()
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(h)
+  if (!m) return `rgba(253, 251, 245, ${a})`
+  let r = 0
+  let g = 0
+  let b = 0
+  const v = m[1]
+  if (v.length === 3) {
+    r = parseInt(v[0] + v[0], 16)
+    g = parseInt(v[1] + v[1], 16)
+    b = parseInt(v[2] + v[2], 16)
+  } else {
+    r = parseInt(v.slice(0, 2), 16)
+    g = parseInt(v.slice(2, 4), 16)
+    b = parseInt(v.slice(4, 6), 16)
+  }
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}

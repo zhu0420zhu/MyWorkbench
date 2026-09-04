@@ -633,8 +633,10 @@ export interface Api {
     saveDraft: (title: string, content: string) => Promise<string | null>
   }
   prefs: {
-    get: () => Promise<{ colorPrimary: string; defaultPage: string }>
-    set: (prefs: { colorPrimary: string; defaultPage: string }) => Promise<{ colorPrimary: string; defaultPage: string }>
+    get: () => Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }>
+    set: (
+      prefs: { colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }
+    ) => Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }>
   }
   translate: {
     run: (text: string, source: string, target: string) => Promise<{ ok: boolean; value?: string; error?: string }>
