@@ -417,6 +417,12 @@ interface CloseGuardOptions {
 let primaryWindow: BrowserWindow | null = null
 let guardOptions: CloseGuardOptions = {}
 let tray: Tray | null = null
+/** 关闭守卫触发的最小化标志：用于抑制主窗口最小化时自动弹出便利贴面板 */
+let closeGuardMinimize = false
+
+export function isCloseGuardMinimize(): boolean {
+  return closeGuardMinimize
+}
 
 function resolveTrayIcon(): string | null {
   const candidates = [
@@ -477,12 +483,13 @@ export function quitApp(): void {
 
 function sendBackground(win: BrowserWindow): void {
   guardOptions.onBackground?.()
-  if (trayAvailable()) {
-    win.hide()
-  } else {
-    // 托盘不可用（缺少图标）时退化为普通最小化，保证窗口一定能找回
-    win.minimize()
-  }
+  trayAvailable() // 确保托盘图标存在，用户仍可从托盘恢复
+  // 改为最小化而非 hide：关闭→后台时窗口保留在任务栏，避免用户找不到入口
+  closeGuardMinimize = true
+  win.minimize()
+  setImmediate(() => {
+    closeGuardMinimize = false
+  })
 }
 
 /** 询问渲染层：返回 null 表示渲染层无响应（超时/未实现） */

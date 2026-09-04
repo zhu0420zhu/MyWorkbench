@@ -96,7 +96,8 @@ import {
   attachWindowManager,
   attachCloseGuard,
   registerWindowIpc,
-  MAIN_PROFILE
+  MAIN_PROFILE,
+  isCloseGuardMinimize
 } from './windowManager'
 import {
   openPageWindow,
@@ -183,8 +184,11 @@ function createWindow(): void {
   })
 
   // 最小化时把便利贴抽离为无边框悬浮窗独立显示在桌面；还原时自动收起
+  // 关闭守卫选择「最小化到后台」时也会触发 minimize，此时应抑制便利贴面板弹出
   mainWindow.on('minimize', () => {
-    void showStickyPanel()
+    if (!isCloseGuardMinimize()) {
+      void showStickyPanel()
+    }
   })
   mainWindow.on('restore', () => {
     closeStickyPanel()
