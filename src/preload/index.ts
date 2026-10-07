@@ -10,7 +10,12 @@ import type {
   AutomationDoneEvent,
   SearchResult,
   AiConfig,
+  AiProfile,
+  AiProfilesState,
   AiChatMessage,
+  AgentHubSnapshot,
+  DashboardOverview,
+  UsageStatsState,
   AiTool,
   AiChunkEvent,
   AiDoneEvent,
@@ -106,10 +111,19 @@ import type {
   SkillImportResult,
   SkillRunResult,
   WritingSkill,
+  NovelWorkflow,
+  ProjectWorkflowState,
+  DocOpenResult,
+  SurgicalExtractResult,
+  SurgicalApplyResult,
+  SurgicalEdit,
   DataAssetRecord,
   DataAssetColumn,
   ReferenceRecord,
-  ReferenceScope
+  ReferenceScope,
+  KbCandidate,
+  KbInjectBlock,
+  KbRefPick
 } from '../shared/types'
 
 /** 窗口缩放方向：四边 + 四角（与 main/windowManager 的 ResizeEdge 保持字面量一致） */
@@ -235,6 +249,7 @@ const api = {
       genre?: string
       synopsis?: string
       targetWords?: number
+      workflowId?: string
     }): Promise<NovelProject> => ipcRenderer.invoke('novel:create-project', input),
     getProject: (projectId: string): Promise<NovelProject | null> =>
       ipcRenderer.invoke('novel:get-project', projectId),
@@ -245,6 +260,16 @@ const api = {
       ipcRenderer.invoke('novel:update-project', projectId, patch),
     removeProject: (projectId: string): Promise<boolean> =>
       ipcRenderer.invoke('novel:remove-project', projectId),
+
+    /* ---- 写作工作流（新建自动挂载） ---- */
+    listWorkflows: (): Promise<NovelWorkflow[]> => ipcRenderer.invoke('novel:list-workflows'),
+    getWorkflow: (projectId: string): Promise<ProjectWorkflowState | null> =>
+      ipcRenderer.invoke('novel:get-workflow', projectId),
+    workflowStepDone: (projectId: string, stepId: string, done: boolean): Promise<ProjectWorkflowState | null> =>
+      ipcRenderer.invoke('novel:workflow-step-done', projectId, stepId, done),
+    switchWorkflow: (projectId: string, workflowId: string): Promise<ProjectWorkflowState | null> =>
+      ipcRenderer.invoke('novel:switch-workflow', projectId, workflowId),
+    seedWorkflowSkills: (): Promise<number> => ipcRenderer.invoke('novel:seed-workflow-skills'),
 
     createVolume: (projectId: string, title: string, summary?: string): Promise<Volume[]> =>
       ipcRenderer.invoke('novel:create-volume', projectId, title, summary),
@@ -611,12 +636,11 @@ const api = {
       ipcRenderer.invoke('writing:save-draft', { title, content })
   },
   prefs: {
-    get: (): Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }> =>
-      ipcRenderer.invoke('prefs:get'),
-    set: (
-      prefs: { colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }
-    ): Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }> =>
-      ipcRenderer.invoke('prefs:set', prefs)
+    get: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('prefs:get'),
+    set: (prefs: Record<string, unknown>): Promise<Record<string, unknown>> => ipcRenderer.invoke('prefs:set', prefs),
+    pickWallpaper: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('prefs:pick-wallpaper'),
+    wallpaperUrl: (path: string): Promise<string> => ipcRenderer.invoke('prefs:wallpaper-url', path)
   },
   translate: {
     run: (text: string, source: string, target: string): Promise<{ ok: boolean; value?: string; error?: string }> =>
@@ -643,6 +667,33 @@ const api = {
   },
   pickTextFile: (): Promise<{ name: string; content: string } | null> =>
     ipcRenderer.invoke('file:pick-text'),
+  docs: {
+    pick: (): Promise<DocOpenResult> => ipcRenderer.invoke('docs:pick'),
+    openPath: (path: string): Promise<DocOpenResult> => ipcRenderer.invoke('docs:open-path', path),
+    save: (path: string, content: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('docs:save', path, content),
+    saveAs: (content: string, defaultName?: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('docs:save-as', content, defaultName),
+    saveAsFormat: (
+      payload: { source: 'text' | 'html'; content: string; defaultName?: string; format?: string }
+    ): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('docs:save-as-format', payload),
+    saveHtmlAs: (html: string, defaultName?: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('docs:save-html-as', html, defaultName),
+    saveDocxAs: (html: string, defaultName?: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('docs:save-docx-as', html, defaultName),
+    saveOffice: (path: string, html: string): Promise<{ ok: boolean; error?: string; note?: string }> =>
+      ipcRenderer.invoke('docs:save-office', path, html),
+    print: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('docs:print'),
+    surgicalExtract: (path: string): Promise<SurgicalExtractResult> =>
+      ipcRenderer.invoke('docs:surgical-extract', path),
+    surgicalApply: (path: string, edits: SurgicalEdit[]): Promise<SurgicalApplyResult> =>
+      ipcRenderer.invoke('docs:surgical-apply', path, edits)
+  },
+  ppt: {
+    available: (): Promise<boolean> => ipcRenderer.invoke('ppt:available'),
+    toPdf: (sourcePath: string): Promise<{ ok: boolean; bytes?: Uint8Array; error?: string }> =>
+      ipcRenderer.invoke('ppt:to-pdf', sourcePath)
+  },
   searchAll: (query: string): Promise<SearchResult[]> => ipcRenderer.invoke('search:all', query),
   aiMemory: {
     load: (): Promise<{ enabled: boolean; messages: AiChatMessage[] }> => ipcRenderer.invoke('ai:memory-load'),
@@ -664,6 +715,40 @@ const api = {
     saveConfig: (cfg: AiConfig): Promise<AiConfig> => ipcRenderer.invoke('ai:save-config', cfg),
     testConnection: (): Promise<{ ok: boolean; error?: string; latencyMs?: number }> =>
       ipcRenderer.invoke('ai:test-connection'),
+    listProfiles: (): Promise<import('../shared/types').AiProfilesState> => ipcRenderer.invoke('ai:list-profiles'),
+    addProfile: (input: {
+      name: string
+      endpoint?: string
+      apiKey?: string
+      model?: string
+      systemPrompt?: string
+      secondaryModel?: string
+      activate?: boolean
+    }): Promise<import('../shared/types').AiProfilesState> => ipcRenderer.invoke('ai:add-profile', input),
+    updateProfile: (
+      id: string,
+      patch: Partial<{
+        name: string
+        endpoint: string
+        apiKey: string
+        model: string
+        systemPrompt: string
+        secondaryModel: string
+      }>
+    ): Promise<import('../shared/types').AiProfilesState> => ipcRenderer.invoke('ai:update-profile', id, patch),
+    removeProfile: (id: string): Promise<import('../shared/types').AiProfilesState> =>
+      ipcRenderer.invoke('ai:remove-profile', id),
+    setActiveProfile: (id: string): Promise<import('../shared/types').AiProfilesState> =>
+      ipcRenderer.invoke('ai:set-active-profile', id),
+    testProfile: (cfg: AiConfig): Promise<{ ok: boolean; error?: string; latencyMs?: number }> =>
+      ipcRenderer.invoke('ai:test-profile', cfg),
+    listModels: (endpoint: string, apiKey?: string): Promise<{ ok: boolean; models: string[]; error?: string }> =>
+      ipcRenderer.invoke('ai:list-models', endpoint, apiKey),
+    addOllama: (opts?: { endpoint?: string; model?: string; name?: string }) =>
+      ipcRenderer.invoke('ai:add-ollama', opts),
+    getRouting: () => ipcRenderer.invoke('ai:get-routing'),
+    setRouting: (r: { primaryId?: string; fallbackId?: string; mode?: string }) =>
+      ipcRenderer.invoke('ai:set-routing', r),
     chat: (
       sessionId: string,
       messages: AiChatMessage[],
@@ -684,6 +769,56 @@ const api = {
       ipcRenderer.on('ai:done', handler)
       return () => ipcRenderer.removeListener('ai:done', handler)
     }
+  },
+  usage: {
+    pageVisit: (page: string): Promise<void> => ipcRenderer.invoke('usage:page-visit', page),
+    dashboard: (): Promise<DashboardOverview> => ipcRenderer.invoke('usage:dashboard'),
+    reset: (): Promise<UsageStatsState> => ipcRenderer.invoke('usage:reset')
+  },
+  hub: {
+    snapshot: (): Promise<import('../shared/types').AgentHubSnapshot> => ipcRenderer.invoke('hub:snapshot'),
+    runtimes: () => ipcRenderer.invoke('hub:runtimes'),
+    renameWorkspace: (name: string) => ipcRenderer.invoke('hub:rename-workspace', name),
+    listAgents: () => ipcRenderer.invoke('hub:list-agents'),
+    upsertAgent: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-agent', input),
+    removeAgent: (id: string) => ipcRenderer.invoke('hub:remove-agent', id),
+    bindSkills: (agentId: string, skillIds: string[]) => ipcRenderer.invoke('hub:bind-skills', agentId, skillIds),
+    listSquads: () => ipcRenderer.invoke('hub:list-squads'),
+    upsertSquad: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-squad', input),
+    listIssues: () => ipcRenderer.invoke('hub:list-issues'),
+    createIssue: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:create-issue', input),
+    updateIssue: (id: string, patch: Record<string, unknown>) => ipcRenderer.invoke('hub:update-issue', id, patch),
+    commentIssue: (issueId: string, author: string, kind: string, body: string) =>
+      ipcRenderer.invoke('hub:comment-issue', issueId, author, kind, body),
+    removeIssue: (id: string) => ipcRenderer.invoke('hub:remove-issue', id),
+    runIssue: (id: string, force?: boolean) => ipcRenderer.invoke('hub:run-issue', id, force),
+    reviewIssue: (id: string, approve: boolean, note?: string) => ipcRenderer.invoke('hub:review-issue', id, approve, note),
+    listRuns: (issueId?: string) => ipcRenderer.invoke('hub:list-runs', issueId),
+    inboxRead: (id: string, read?: boolean) => ipcRenderer.invoke('hub:inbox-read', id, read),
+    inboxClear: () => ipcRenderer.invoke('hub:inbox-clear'),
+    listAutopilots: () => ipcRenderer.invoke('hub:list-autopilots'),
+    upsertAutopilot: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-autopilot', input),
+    removeAutopilot: (id: string) => ipcRenderer.invoke('hub:remove-autopilot', id),
+    generatePlan: (opts: { title: string; detail?: string; issueId?: string; goalId?: string }) =>
+      ipcRenderer.invoke('hub:generate-plan', opts),
+    executePlan: (planId: string) => ipcRenderer.invoke('hub:execute-plan', planId),
+    upsertPlan: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-plan', input),
+    upsertGoal: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-goal', input),
+    advanceGoal: (goalId: string) => ipcRenderer.invoke('hub:advance-goal', goalId),
+    setDuty: (slots: unknown[]) => ipcRenderer.invoke('hub:set-duty', slots),
+    upsertApp: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-app', input),
+    runApp: (appId: string) => ipcRenderer.invoke('hub:run-app', appId),
+    upsertWorkspaceDir: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-workspace-dir', input),
+    addExperience: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:add-experience', input),
+    addMemory: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:add-memory', input),
+    upsertImChannel: (input: Record<string, unknown>) => ipcRenderer.invoke('hub:upsert-im', input),
+    sendIm: (channelId: string, title: string, body: string) => ipcRenderer.invoke('hub:send-im', channelId, title, body),
+    testIm: (channel: Record<string, unknown>) => ipcRenderer.invoke('hub:test-im', channel),
+    marketCatalog: (remoteUrl?: string) => ipcRenderer.invoke('hub:market-catalog', remoteUrl),
+    marketInstall: (id: string) => ipcRenderer.invoke('hub:market-install', id),
+    codeIndexBuild: (rootDir: string) => ipcRenderer.invoke('hub:code-index-build', rootDir),
+    codeIndexQuery: (q: string) => ipcRenderer.invoke('hub:code-index-query', q),
+    sandboxRun: (cwd: string, command: string, timeoutMs?: number) => ipcRenderer.invoke('hub:sandbox-run', cwd, command, timeoutMs)
   },
   data: {
     info: (): Promise<DataInfo> => ipcRenderer.invoke('data:info'),
@@ -777,6 +912,138 @@ const api = {
     cleanupTemp: (expireHours?: number): Promise<ConvertCleanupResult> =>
       ipcRenderer.invoke('convert:cleanup-temp', expireHours)
   },
+  media: {
+    ffmpegAvailable: (): Promise<boolean> => ipcRenderer.invoke('media:ffmpeg-available'),
+    pickImages: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-images'),
+    pickImage: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-image'),
+    pickVideos: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-videos'),
+    pickVideo: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-video'),
+    pickAudios: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-audios'),
+    pickAudio: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-audio'),
+    pickMedia: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('media:pick-media'),
+    savePath: (defaultName: string, exts: string[]): Promise<string | null> =>
+      ipcRenderer.invoke('media:save-path', defaultName, exts),
+    readFile: (filePath: string): Promise<Uint8Array | null> => ipcRenderer.invoke('media:read-file', filePath),
+    writeFile: (filePath: string, data: Uint8Array): Promise<boolean> =>
+      ipcRenderer.invoke('media:write-file', filePath, data),
+    probe: (filePath: string): Promise<{
+      ok: boolean
+      error?: string
+      durationSec: number
+      width: number
+      height: number
+      fps: number
+      hasAudio: boolean
+      hasVideo: boolean
+      sizeBytes: number
+      formatName: string
+      videoCodec: string
+      audioCodec: string
+    }> => ipcRenderer.invoke('media:probe', filePath),
+    convert: (input: {
+      sourcePath: string
+      targetFormat: string
+      outputPath?: string
+      quality?: 'low' | 'medium' | 'high'
+      kind?: 'video' | 'audio' | 'gif'
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number; durationMs?: number }> =>
+      ipcRenderer.invoke('media:convert', input),
+    extractFrame: (input: {
+      sourcePath: string
+      timeSec: number
+      outputPath?: string
+      format?: 'png' | 'jpg' | 'webp'
+      width?: number
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('media:extract-frame', input),
+    videoToGif: (input: {
+      sourcePath: string
+      startSec: number
+      endSec: number
+      outputPath?: string
+      fps?: number
+      width?: number
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('media:video-to-gif', input),
+    extractAudio: (input: {
+      sourcePath: string
+      outputPath?: string
+      targetFormat?: string
+      quality?: 'low' | 'medium' | 'high'
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('media:extract-audio', input),
+    trim: (input: {
+      sourcePath: string
+      startSec: number
+      endSec: number
+      outputPath?: string
+      reencode?: boolean
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('media:trim', input),
+    imageConvert: (input: {
+      sourcePath: string
+      targetFormat: string
+      outputPath?: string
+      quality?: 'low' | 'medium' | 'high'
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('media:image-convert', input)
+  },
+  hardware: {
+    clipboardList: (): Promise<
+      Array<{
+        id: string
+        kind: 'text' | 'image' | 'files'
+        text?: string
+        preview?: string
+        filePaths?: string[]
+        imageDataUrl?: string
+        size: number
+        createdAt: number
+      }>
+    > => ipcRenderer.invoke('hardware:clipboard-list'),
+    clipboardClear: (): Promise<boolean> => ipcRenderer.invoke('hardware:clipboard-clear'),
+    clipboardRemove: (id: string): Promise<boolean> => ipcRenderer.invoke('hardware:clipboard-remove', id),
+    clipboardCopy: (id: string): Promise<boolean> => ipcRenderer.invoke('hardware:clipboard-copy', id),
+    onClipboardEvent: (cb: (entry: unknown) => void): (() => void) => {
+      const handler = (_e: unknown, entry: unknown): void => cb(entry)
+      ipcRenderer.on('hardware:clipboard-event', handler)
+      return () => ipcRenderer.removeListener('hardware:clipboard-event', handler)
+    },
+    system: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:system', force),
+    cpuMemory: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:cpu-memory', force),
+    graphics: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:graphics', force),
+    board: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:board', force),
+    disk: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:disk', force),
+    network: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:network', force),
+    power: (force = false): Promise<unknown> => ipcRenderer.invoke('hardware:power', force),
+    summary: (): Promise<unknown> => ipcRenderer.invoke('hardware:summary')
+  },
+  pdf: {
+    sofficeAvailable: (): Promise<boolean> => ipcRenderer.invoke('pdf:soffice-available'),
+    pickPdfs: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('pdf:pick-pdfs'),
+    pickExcel: (): Promise<Array<{ path: string; name: string; size: number }>> =>
+      ipcRenderer.invoke('pdf:pick-excel'),
+    read: (filePath: string): Promise<Uint8Array | null> => ipcRenderer.invoke('pdf:read', filePath),
+    write: (filePath: string, data: Uint8Array): Promise<boolean> => ipcRenderer.invoke('pdf:write', filePath, data),
+    savePath: (defaultName: string, exts: string[]): Promise<string | null> =>
+      ipcRenderer.invoke('pdf:save-path', defaultName, exts),
+    pickDir: (title?: string): Promise<string | null> => ipcRenderer.invoke('pdf:pick-dir', title),
+    exists: (paths: string[]): Promise<boolean[]> => ipcRenderer.invoke('pdf:exists', paths),
+    excelToPdf: (input: {
+      sourcePath: string
+      outputPath?: string
+      pageOrientation?: 'auto' | 'portrait' | 'landscape'
+    }): Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }> =>
+      ipcRenderer.invoke('pdf:excel-to-pdf', input)
+  },
   searchIndex: {
     ingest: (filePath: string): Promise<IngestResult> => ipcRenderer.invoke('searchIndex:ingest', filePath),
     ingestDir: (dir: string, recursive?: boolean, extFilter?: string[]): Promise<IngestResult[]> =>
@@ -800,7 +1067,11 @@ const api = {
     assetColumns: (assetId: string): Promise<DataAssetColumn[]> => ipcRenderer.invoke('knowledgeBase:assetColumns', assetId),
     addReference: (rec: ReferenceRecord): Promise<void> => ipcRenderer.invoke('knowledgeBase:addReference', rec),
     listReferences: (scope?: ReferenceScope, refPos?: string): Promise<ReferenceRecord[]> =>
-      ipcRenderer.invoke('knowledgeBase:listReferences', scope, refPos)
+      ipcRenderer.invoke('knowledgeBase:listReferences', scope, refPos),
+    listCandidates: (q?: string): Promise<KbCandidate[]> => ipcRenderer.invoke('knowledgeBase:listCandidates', q),
+    resolveInject: (picks: KbRefPick[], query?: string): Promise<KbInjectBlock[]> =>
+      ipcRenderer.invoke('knowledgeBase:resolveInject', picks, query),
+    renderInject: (blocks: KbInjectBlock[]): Promise<string> => ipcRenderer.invoke('knowledgeBase:renderInject', blocks)
   },
   kbData: {
     aggregate: (req: AggregateRequest): Promise<AggregateResult> => ipcRenderer.invoke('kbData:aggregate', req),

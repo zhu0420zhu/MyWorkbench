@@ -178,6 +178,21 @@ export async function listSkills(): Promise<WritingSkill[]> {
   return [...idx.skills].sort((a, b) => a.createdAt - b.createdAt)
 }
 
+/** 幂等合并写入：已有同 id 跳过，缺失则追加（供工作流播种，不覆盖用户改过的 Skill） */
+export async function mergeSkillsIfAbsent(candidates: WritingSkill[]): Promise<number> {
+  const idx = await readSkills()
+  const have = new Set(idx.skills.map((s) => s.id))
+  let added = 0
+  for (const s of candidates) {
+    if (!s?.id || have.has(s.id)) continue
+    idx.skills.push({ ...s })
+    have.add(s.id)
+    added++
+  }
+  if (added) await writeSkills(idx)
+  return added
+}
+
 export interface CreateSkillInput {
   name: string
   description?: string

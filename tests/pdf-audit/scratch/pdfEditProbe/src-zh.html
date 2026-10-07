@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>灵墨工作台 PDF 文本层提取验证</title>
+<style>
+  body { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 12pt; }
+  h1 { font-size: 24pt; }
+  h2 { font-size: 17pt; }
+  p { line-height: 1.6; }
+</style>
+</head>
+<body>
+<h1>文档处理功能验证</h1>
+<p>这是第一段中文正文，用于验证 PDF 文本层提取时的汉字拼接是否正确。逐字输出的汉字之间不应该出现空格。</p>
+<p>这是第二段中文正文，其中混排了 PDF 与 Word 等英文词，验证中英混排同一行时的空格处理。年份 2026 与小数 1.5 也不应被误判为列表。</p>
+<h2>列表与子标题</h2>
+<ul>
+  <li>无序列表第一项</li>
+  <li>无序列表第二项</li>
+</ul>
+<ol>
+  <li>有序列表第一项</li>
+  <li>有序列表第二项</li>
+</ol>
+</body>
+</html>

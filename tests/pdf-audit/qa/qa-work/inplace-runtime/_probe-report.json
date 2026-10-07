@@ -1,0 +1,191 @@
+{
+  "result": {
+    "rows": [
+      {
+        "name": "preload 暴露 api.pdf.read",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "preload 暴露 api.pdf.write",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "preload 暴露 api.pdf.savePath",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "preload 暴露 api.pdf.pickDir",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "preload 暴露 api.pdf.exists",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "preload 暴露 api.pdf.pickPdfs",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "渲染进程是真实 Chromium canvas（非 @napi-rs 替身）",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "pdf:pick-pdfs 返回素材（主进程真实走完 allowPath 登记）",
+        "pass": true,
+        "detail": "[{\"path\":\"D:\\\\YM\\\\MyWorkbench\\\\tests\\\\pdf-audit\\\\qa\\\\qa-work\\\\inplace-runtime\\\\doc\\\\QA-合同.pdf\",\"name\":\"QA-合同.pdf\",\"size\":3755}]"
+      },
+      {
+        "name": "pick-pdfs 返回的路径与探针约定一致",
+        "pass": true,
+        "detail": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc\\QA-合同.pdf vs D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc\\QA-合同.pdf"
+      },
+      {
+        "name": "pdf:read 在已登记路径上返回字节（ACL 放行）",
+        "pass": true,
+        "detail": "3755 B"
+      },
+      {
+        "name": "素材经 pdf-lib 可解析且页数为 3",
+        "pass": true,
+        "detail": "3"
+      },
+      {
+        "name": "replacePdfText 在真实渲染进程内不抛异常",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "产出字节与输入不同（确实写了东西）",
+        "pass": true,
+        "detail": "19f4adaa2d6d6a3b → aceaad7ed1acedcf"
+      },
+      {
+        "name": "产出页数不变",
+        "pass": true,
+        "detail": "3"
+      },
+      {
+        "name": "中文栅格路径在真实渲染进程内新增 Image XObject",
+        "pass": true,
+        "detail": "输入 1 → 输出 3"
+      },
+      {
+        "name": "产出仍可被 pdf-lib 解析（结构未损坏）",
+        "pass": true,
+        "detail": "16703 B"
+      },
+      {
+        "name": "pdf:write 写回原文件返回 true（真实 ACL 放行同路径）",
+        "pass": true,
+        "detail": "true"
+      },
+      {
+        "name": "备份写到同目录不同名 → 允许（ACL 同目录产物规则生效）",
+        "pass": true,
+        "detail": "true"
+      },
+      {
+        "name": "备份写到【其它目录】→ 被拒（反例：ACL 不是全放行）",
+        "pass": true,
+        "detail": "false"
+      },
+      {
+        "name": "从未登记过的路径写入 → 被拒",
+        "pass": true,
+        "detail": "false"
+      },
+      {
+        "name": "未登记路径 pdf:exists 恒返回 false（不泄露文件系统信息）",
+        "pass": true,
+        "detail": "[false]"
+      },
+      {
+        "name": "pdf:save-path 返回用户选定路径",
+        "pass": true,
+        "detail": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\QA-已编辑.pdf"
+      },
+      {
+        "name": "另存为写入返回 true",
+        "pass": true,
+        "detail": "true"
+      },
+      {
+        "name": "覆盖后回读原文件成功",
+        "pass": true,
+        "detail": "16703 B"
+      },
+      {
+        "name": "回读字节 == 写入字节（落盘未被截断/改写）",
+        "pass": true,
+        "detail": "aceaad7ed1acedcf vs aceaad7ed1acedcf"
+      },
+      {
+        "name": "回读字节 != 编辑前字节（保存确实改变了文件）",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "· 观察：同目录下的任意文件名写入返回 true（ACL「同目录」规则的授权面）",
+        "pass": true,
+        "detail": ""
+      }
+    ],
+    "beforeSum": "19f4adaa2d6d6a3b",
+    "editedSum": "aceaad7ed1acedcf",
+    "beforeLen": 3755,
+    "editedLen": 16703,
+    "docPath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc\\QA-合同.pdf",
+    "backupPath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc\\QA-合同-备份-20260929120000.pdf",
+    "backupElsewherePath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\elsewhere\\QA-合同-备份.pdf",
+    "saveAsTarget": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\QA-已编辑.pdf",
+    "unauthorizedPath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\never-registered\\x.pdf"
+  },
+  "dialogCalls": [
+    {
+      "kind": "open",
+      "options": {
+        "title": "选择 PDF 文件",
+        "filters": [
+          {
+            "name": "PDF",
+            "extensions": [
+              "pdf"
+            ]
+          },
+          {
+            "name": "所有文件",
+            "extensions": [
+              "*"
+            ]
+          }
+        ],
+        "properties": [
+          "openFile",
+          "multiSelections"
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "导出文件",
+        "defaultPath": "QA-已编辑.pdf",
+        "filters": [
+          {
+            "name": "文件",
+            "extensions": [
+              "pdf"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

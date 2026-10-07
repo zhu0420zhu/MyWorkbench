@@ -1,0 +1,7 @@
+{
+  "name": "probe-save-as",
+  "private": true,
+  "version": "0.0.0",
+  "description": "QA 探针：真实 Electron 下验证「另存为多格式」空内容守卫与落盘扩展名对齐（真实 preload + 真实 docs IPC）",
+  "main": "main.js"
+}

@@ -10,6 +10,7 @@ import {
   DiskAnalyzer,
   findDuplicates,
   getFileWatcher,
+  initFileWatcher,
   compareFolders
 } from './tools/index.ts'
 import type { ScanOptions, DuplicateScanOptions, FolderCompareOptions } from './tools/index.ts'
@@ -48,7 +49,12 @@ export function registerToolsIpc(): void {
 
   // ---- 文件监控（事件推送到所有窗口）----
   const watcher = getFileWatcher()
-  ipcMain.handle('tools:watcher-add', (_e, dir: string, name?: string) => watcher.addWatch(dir, name))
+  // 启动时注册默认目录（桌面/下载）；渲染层 list/add 先等它完成，避免拿到空列表
+  void initFileWatcher()
+  ipcMain.handle('tools:watcher-add', async (_e, dir: string, name?: string) => {
+    await initFileWatcher()
+    return watcher.addWatch(dir, name)
+  })
   ipcMain.handle('tools:watcher-remove', (_e, dir: string) => watcher.removeWatch(dir))
   ipcMain.handle('tools:watcher-start', () => {
     watcher.start()
@@ -66,7 +72,10 @@ export function registerToolsIpc(): void {
     watcher.resume()
     return true
   })
-  ipcMain.handle('tools:watcher-list', () => watcher.watchedDirectories)
+  ipcMain.handle('tools:watcher-list', async () => {
+    await initFileWatcher()
+    return watcher.watchedDirectories
+  })
   watcher.addCallback((event) => {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send('tools:watcher-event', event)

@@ -27,14 +27,41 @@ export function emptyCard(name = '新角色'): CharacterCard {
   }
 }
 
+/** V2 契约内（本工程建模）的顶层字段集合 */
+const KNOWN_CARD_KEYS = new Set<string>([
+  'name',
+  'description',
+  'personality',
+  'scenario',
+  'first_mes',
+  'mes_example',
+  'creator_notes',
+  'system_prompt',
+  'post_history_instructions',
+  'alternate_greetings',
+  'tags',
+  'creator',
+  'character_version',
+  'extensions'
+])
+
 export function cardToJson(card: CharacterCard): string {
-  return JSON.stringify(card)
+  // 把留存位（未知顶层字段）展平回顶层：输出结构与导入时等价，不留 __extra 内部键。
+  // 已知字段后展开，确保契约字段永远优先于同名留存键。
+  const { __extra, ...known } = card
+  return JSON.stringify({ ...(__extra ?? {}), ...known })
 }
 
 function parseCardJson(text: string): CharacterCard | null {
   try {
-    const raw = JSON.parse(text) as Partial<CharacterCard>
-    return {
+    const raw = JSON.parse(text) as Record<string, unknown>
+    // 收集不认识的顶层键，往返零损保留
+    const extra: Record<string, unknown> = {}
+    for (const k of Object.keys(raw)) {
+      if (k === '__extra' || KNOWN_CARD_KEYS.has(k)) continue
+      extra[k] = raw[k]
+    }
+    const card: CharacterCard = {
       name: String(raw.name ?? '未命名'),
       description: String(raw.description ?? ''),
       personality: String(raw.personality ?? ''),
@@ -50,6 +77,8 @@ function parseCardJson(text: string): CharacterCard | null {
       character_version: String(raw.character_version ?? ''),
       extensions: (raw.extensions as Record<string, unknown>) ?? {}
     }
+    if (Object.keys(extra).length > 0) card.__extra = extra
+    return card
   } catch {
     return null
   }
@@ -106,26 +135,39 @@ export async function listCharacters(): Promise<CharacterMeta[]> {
   return metas
 }
 
-/** 保存角色：纯 JSON 卡（保留原有 PNG 头像时走 updateAvatar） */
+/**
+ * 保存角色：以 getCharacter 的读取顺序为准——若存在合法 PNG 卡，就把新卡片 JSON
+ * 嵌回该 PNG（保留原图字节），否则写纯 JSON 文件。
+ * 关键：PNG 卡编辑后必须回写 PNG，否则写入的 .json 永远不会被 getCharacter 读到，
+ * 用户会看到「保存成功」但重载后仍是旧卡（静默丢数据）。回写 PNG 时顺带删除同 id
+ * 的 .json 残留，避免双份影子文件。
+ */
 export async function saveCharacter(id: string, card: CharacterCard): Promise<CharacterMeta> {
-  const jsonPath = join(charactersDir(), `${id}.json`)
-  await fs.mkdir(charactersDir(), { recursive: true })
+  const dir = charactersDir()
+  await fs.mkdir(dir, { recursive: true })
+  const pngPath = join(dir, `${id}.png`)
+  const jsonPath = join(dir, `${id}.json`)
+  const pngBuf = await fs.readFile(pngPath).catch(() => null)
+  if (pngBuf && isPng(new Uint8Array(pngBuf))) {
+    const out = embedCharaInPng(new Uint8Array(pngBuf), cardToJson(card))
+    await fs.writeFile(pngPath, Buffer.from(out))
+    await removeFile(jsonPath)
+    return { id, card, hasAvatar: true, updatedAt: Date.now() }
+  }
   await fs.writeFile(jsonPath, cardToJson(card), 'utf-8')
   return { id, card, hasAvatar: false, updatedAt: Date.now() }
 }
 
-/** 更新角色头像（原角色为 PNG 卡时，把新卡 JSON 嵌回 PNG 的 tEXt） */
+/** 更新角色头像（把当前卡片 JSON 嵌回新 PNG 的 tEXt） */
 export async function updateCharacterAvatar(id: string, pngBytes: Uint8Array): Promise<boolean> {
   try {
     const dir = charactersDir()
     await fs.mkdir(dir, { recursive: true })
-    const existingPng = await fs.readFile(join(dir, `${id}.png`)).catch(() => null)
-    const card = existingPng && isPng(existingPng)
-      ? extractCharaFromPng(new Uint8Array(existingPng))
-      : await fs.readFile(join(dir, `${id}.json`), 'utf-8').catch(() => null)
+    // 统一以 getCharacter 的读取顺序取「当前卡片」：这样「先编辑保存、再换头像」不会丢编辑
+    const meta = await getCharacter(id)
     let out = pngBytes
-    if (card && isPng(pngBytes)) {
-      out = embedCharaInPng(pngBytes, card)
+    if (meta && isPng(pngBytes)) {
+      out = embedCharaInPng(pngBytes, cardToJson(meta.card))
     }
     await fs.writeFile(join(dir, `${id}.png`), Buffer.from(out))
     await removeFile(join(dir, `${id}.json`))

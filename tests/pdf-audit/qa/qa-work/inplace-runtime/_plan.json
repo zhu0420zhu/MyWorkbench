@@ -1,0 +1,15 @@
+{
+  "preloadPath": "D:\\YM\\MyWorkbench\\out\\preload\\index.js",
+  "pagePath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\probe-inplace-save\\index.html",
+  "openDialogs": [
+    [
+      "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc\\QA-合同.pdf"
+    ],
+    [
+      "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\doc"
+    ]
+  ],
+  "saveDialogs": [
+    "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\qa-work\\inplace-runtime\\QA-已编辑.pdf"
+  ]
+}

@@ -1,0 +1,233 @@
+{
+  "decrypt": [
+    {
+      "file": "owner-only-r4.pdf",
+      "note": "空用户口令/仅所有者口令",
+      "alg": "AES-128",
+      "detected": "AES-128",
+      "supported": true,
+      "userPwdLen": 0,
+      "userOk": true,
+      "userBytes": 4929,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "classic-xref-aes128.pdf",
+      "note": "经典 xref 表",
+      "alg": "AES-128",
+      "detected": "AES-128",
+      "supported": true,
+      "userPwdLen": 18,
+      "userOk": true,
+      "userBytes": 4887,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "classic-xref-rc4.pdf",
+      "note": "经典 xref 表",
+      "alg": "RC4 128-bit",
+      "detected": "RC4 128-bit",
+      "supported": true,
+      "userPwdLen": 18,
+      "userOk": true,
+      "userBytes": 4887,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "incremental-aes128.pdf",
+      "note": "增量更新 /Prev 链",
+      "alg": "AES-128",
+      "detected": "AES-128",
+      "supported": true,
+      "userPwdLen": 18,
+      "userOk": true,
+      "userBytes": 4947,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "real-large-aes128.pdf",
+      "note": "真实大文件 34 页",
+      "alg": "AES-128",
+      "detected": "AES-128",
+      "supported": true,
+      "userPwdLen": 18,
+      "userOk": true,
+      "userBytes": 1130501,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "real-large-rc4.pdf",
+      "note": "真实大文件 34 页",
+      "alg": "RC4 128-bit",
+      "detected": "RC4 128-bit",
+      "supported": true,
+      "userPwdLen": 18,
+      "userOk": true,
+      "userBytes": 1130501,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "long-pwd-aes128.pdf",
+      "note": "40 字超长口令(须按32字节截断)",
+      "alg": "AES-128",
+      "detected": "AES-128",
+      "supported": true,
+      "userPwdLen": 40,
+      "userOk": true,
+      "userBytes": 4929,
+      "ownerEqUser": true,
+      "wrongPwdCode": "PASSWORD_INCORRECT"
+    },
+    {
+      "file": "rc4-40-r2.pdf",
+      "ownerEqUser": true,
+      "viaMatrix": true
+    },
+    {
+      "file": "rc4-128-r3.pdf",
+      "ownerEqUser": true,
+      "viaMatrix": true
+    },
+    {
+      "file": "rc4-128-r4.pdf",
+      "ownerEqUser": true,
+      "viaMatrix": true
+    },
+    {
+      "file": "aes128-r4.pdf",
+      "ownerEqUser": true,
+      "viaMatrix": true
+    },
+    {
+      "file": "aes128-r4-nometa.pdf",
+      "ownerEqUser": true,
+      "viaMatrix": true
+    }
+  ],
+  "fail": [
+    {
+      "case": "unencrypted enhance-source.pdf",
+      "got": "NOT_ENCRYPTED",
+      "expected": "NOT_ENCRYPTED",
+      "ok": true
+    },
+    {
+      "case": "unencrypted real-large-plain.pdf",
+      "got": "NOT_ENCRYPTED",
+      "expected": "NOT_ENCRYPTED",
+      "ok": true
+    },
+    {
+      "case": "aes256",
+      "got": "UNSUPPORTED_CRYPTO | 该文件使用 AES-256 加密，当前版本暂不支持",
+      "expected": "UNSUPPORTED_CRYPTO + AES-256",
+      "ok": true
+    },
+    {
+      "case": "截断 50%",
+      "got": "MALFORMED",
+      "ms": 2,
+      "timedOut": false,
+      "graceful": true
+    },
+    {
+      "case": "截断 85%",
+      "got": "MALFORMED",
+      "ms": 1,
+      "timedOut": false,
+      "graceful": true
+    },
+    {
+      "case": "截断 40%",
+      "got": "MALFORMED",
+      "ms": 1,
+      "timedOut": false,
+      "graceful": true
+    },
+    {
+      "case": "截断 60%",
+      "got": "MALFORMED",
+      "ms": 42,
+      "timedOut": false,
+      "graceful": true
+    },
+    {
+      "case": "截断 2%(仅缺尾部)",
+      "got": "MALFORMED",
+      "ms": 0,
+      "timedOut": false,
+      "graceful": true
+    },
+    {
+      "case": "empty pwd on non-empty-user file",
+      "got": "PASSWORD_INCORRECT",
+      "expected": "PASSWORD_INCORRECT",
+      "ok": true
+    },
+    {
+      "case": "encrypt already-encrypted",
+      "got": "MALFORMED",
+      "expected": "MALFORMED",
+      "ok": true
+    },
+    {
+      "case": "decrypt already-decrypted",
+      "got": "NOT_ENCRYPTED",
+      "expected": "NOT_ENCRYPTED",
+      "ok": true
+    },
+    {
+      "case": "decrypt determinism",
+      "got": "true",
+      "ok": true
+    }
+  ],
+  "encrypt": [
+    {
+      "label": "enc-source.pdf",
+      "uPwdLen": 18,
+      "bytes": 5754,
+      "hasEncrypt": true,
+      "V4": true,
+      "R4": true,
+      "AESV2": true,
+      "P_in_encrypt_dict": -3904,
+      "classicXref": true,
+      "noObjStm": true,
+      "noXRefStream": true
+    },
+    {
+      "label": "enc-real.pdf",
+      "uPwdLen": 18,
+      "bytes": 1373100,
+      "hasEncrypt": true,
+      "V4": true,
+      "R4": true,
+      "AESV2": true,
+      "P_in_encrypt_dict": -3904,
+      "classicXref": true,
+      "noObjStm": true,
+      "noXRefStream": true
+    },
+    {
+      "label": "enc-longpwd.pdf",
+      "uPwdLen": 40,
+      "bytes": 5754,
+      "hasEncrypt": true,
+      "V4": true,
+      "R4": true,
+      "AESV2": true,
+      "P_in_encrypt_dict": -3904,
+      "classicXref": true,
+      "noObjStm": true,
+      "noXRefStream": true
+    }
+  ],
+  "notes": []
+}

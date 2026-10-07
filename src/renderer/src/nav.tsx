@@ -1,4 +1,4 @@
-﻿import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 
 export type PageKey =
   | 'dashboard'
@@ -8,6 +8,7 @@ export type PageKey =
   | 'boards'
   | 'texttools'
   | 'filetools'
+  | 'toolbox'
   | 'knowledge'
   | 'agents'
   | 'stickies'
@@ -15,6 +16,7 @@ export type PageKey =
   | 'settings'
   | 'writing'
   | 'copywriting'
+  | 'docs'
   | 'gameui'
   | 'novel'
   | 'analytics'

@@ -145,6 +145,378 @@ export interface AiConfig {
   secondaryModel?: string
 }
 
+/** 一套完整 AI 接入配置（多套配置中的单条） */
+export interface AiProfile {
+  id: string
+  /** 显示名：智谱 / Ollama / MiMo… */
+  name: string
+  endpoint: string
+  apiKey: string
+  model: string
+  systemPrompt: string
+  secondaryModel?: string
+  createdAt: number
+  updatedAt: number
+}
+
+/** 多套 AI 配置存储结构 */
+export interface AiProfilesState {
+  activeId: string
+  profiles: AiProfile[]
+  /** 多路调用：本地与 API 可同时使用 */
+  routing?: AiRouting
+}
+
+/** 路由：可多主力并行 / 多备用顺序切换（本地 + 云端可混用） */
+export interface AiRouting {
+  /** 主力配置（可多个：both 模式全部并行） */
+  primaryId: string
+  primaryIds: string[]
+  /** 备用（failover 顺序尝试） */
+  fallbackId?: string
+  fallbackIds: string[]
+  mode: 'primary-only' | 'failover' | 'both'
+}
+
+/* ============================================================
+ * 智能体任务中心（对标 Multica：看板指派 / 角色 / 小队 / 执行日志）
+ * ============================================================ */
+
+export type AgentBrain = 'ai' | 'cli'
+export type IssueStatus = 'backlog' | 'ready' | 'running' | 'review' | 'done' | 'failed'
+export type RunStatus = 'queued' | 'running' | 'success' | 'failed' | 'cancelled'
+export type InboxKind = 'review' | 'blocked' | 'failed' | 'info' | 'report' | 'plan' | 'duty'
+
+/** EvoFlow：Plan 模式 —— 先计划后执行 */
+export interface PlanStep {
+  id: string
+  title: string
+  detail: string
+  done: boolean
+}
+export interface PlanBrief {
+  id: string
+  issueId?: string
+  goalId?: string
+  title: string
+  steps: PlanStep[]
+  /** draft=待修订 approved=可执行 */
+  status: 'draft' | 'approved' | 'executing' | 'done'
+  createdAt: number
+  updatedAt: number
+}
+
+/** EvoFlow：Goal 长目标 */
+export type GoalStatus = 'idle' | 'running' | 'paused' | 'done' | 'failed'
+export interface GoalBrief {
+  id: string
+  title: string
+  description: string
+  status: GoalStatus
+  workspaceDir?: string
+  /** 阶段：可继续拆任务 */
+  stages: Array<{ id: string; title: string; done: boolean }>
+  createdAt: number
+  updatedAt: number
+}
+
+/** 岗位值班 */
+export interface DutySlot {
+  id: string
+  /** 岗位名：文案 / 审校 / 资料 */
+  post: string
+  agentId?: string
+  /** 自动派单：@任务时按岗位找值班 */
+  autoAssign: boolean
+}
+
+/** 应用中心：多节点固定工作流产品化 */
+export interface AppNode {
+  id: string
+  title: string
+  prompt: string
+  /** 下一节点；空则结束 */
+  nextId?: string
+  /** 需人工确认 */
+  requireApproval?: boolean
+}
+export interface EvoApp {
+  id: string
+  name: string
+  description: string
+  nodes: AppNode[]
+  /** 定时分钟；0=手动 */
+  intervalMinutes: number
+  enabled: boolean
+  /** IM 渠道 id，有则完成后派发 */
+  imChannelId?: string
+  lastRunAt?: number
+  createdAt: number
+}
+
+/** 工作空间边界 */
+export interface WorkspaceDir {
+  id: string
+  name: string
+  path: string
+  createdAt: number
+}
+
+/** 代码索引符号 */
+export interface CodeSymbol {
+  name: string
+  kind: 'function' | 'class' | 'const' | 'type' | 'export' | 'other'
+  file: string
+  line: number
+  refCount?: number
+}
+
+/** 资产中心 */
+export interface ExperienceCard {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  sourceIssueId?: string
+  createdAt: number
+}
+export interface AgentMemory {
+  id: string
+  agentId: string
+  kind: 'profile' | 'reflection' | 'memory'
+  body: string
+  createdAt: number
+}
+
+/** IM 渠道 */
+export interface ImChannel {
+  id: string
+  name: string
+  /** 通用 webhook / 完整协议 */
+  kind: 'webhook' | 'feishu' | 'dingtalk' | 'wecom' | 'telegram'
+  webhookUrl: string
+  /** 飞书 app_id/app_secret（可选） */
+  appId?: string
+  appSecret?: string
+  /** 企微 agentid / corpsecret 可选 */
+  agentId?: string
+  corpSecret?: string
+  /** Telegram bot token + chat_id */
+  botToken?: string
+  chatId?: string
+  enabled: boolean
+}
+
+/** 在线资源市场条目 */
+export interface ResourcePack {
+  id: string
+  name: string
+  description: string
+  kind: 'skill' | 'workflow' | 'prompt' | 'extension'
+  version: string
+  author: string
+  /** 下载 JSON 清单 URL 或本地路径 */
+  packageUrl: string
+  tags: string[]
+  installed?: boolean
+}
+
+export interface ResourceCatalog {
+  updatedAt: number
+  packs: ResourcePack[]
+}
+
+/** 沙箱执行记录 */
+export interface SandboxRun {
+  id: string
+  cwd: string
+  command: string
+  status: 'running' | 'ok' | 'failed' | 'timeout'
+  stdout: string
+  stderr: string
+  startedAt: number
+  endedAt?: number
+}
+
+export interface WorkspaceBrief {
+  id: string
+  name: string
+  createdAt: number
+}
+
+export interface AgentRoleBrief {
+  id: string
+  name: string
+  /** 角色说明 / 系统提示 */
+  description: string
+  /** ai=当前模型 complete；cli=本机 Agent CLI */
+  brain: AgentBrain
+  /** cli 模式下的命令，如 claude / codex */
+  cliCommand?: string
+  /** 绑定技能 id 列表 */
+  skillIds: string[]
+  /** 绑定小队 id */
+  squadId?: string
+  /** 岗位（值班用） */
+  post?: string
+  /** 可见性：private=仅本人 */
+  visibility: 'public' | 'private'
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SquadBrief {
+  id: string
+  name: string
+  /** 队长 agent id，负责拆解/派活 */
+  leaderId?: string
+  memberIds: string[]
+  createdAt: number
+}
+
+export interface IssueComment {
+  id: string
+  author: string
+  /** human | agent */
+  kind: 'human' | 'agent'
+  body: string
+  at: number
+}
+
+export interface IssueBrief {
+  id: string
+  workspaceId: string
+  title: string
+  body: string
+  status: IssueStatus
+  assigneeId?: string
+  squadId?: string
+  /** 依赖前置 issue（门控） */
+  blockedBy: string[]
+  /** 关联 git 仓库路径（绑文档/代码上下文） */
+  repoPath?: string
+  labels: string[]
+  comments: IssueComment[]
+  createdAt: number
+  updatedAt: number
+  completedAt?: number
+}
+
+export interface RunLogEvent {
+  t: number
+  level: 'info' | 'warn' | 'error' | 'tool'
+  message: string
+}
+
+export interface RunBrief {
+  id: string
+  issueId: string
+  agentId: string
+  status: RunStatus
+  attempt: number
+  maxAttempts: number
+  startedAt: number
+  endedAt?: number
+  inputPreview: string
+  output?: string
+  error?: string
+  events: RunLogEvent[]
+  approxTokens: number
+  durationMs?: number
+}
+
+export interface InboxItem {
+  id: string
+  kind: InboxKind
+  title: string
+  body: string
+  issueId?: string
+  runId?: string
+  read: boolean
+  createdAt: number
+}
+
+export interface AutopilotBrief {
+  id: string
+  name: string
+  /** cron 最小粒度：分钟间隔 */
+  intervalMinutes: number
+  enabled: boolean
+  /** report=生成报告；custom=自定义提示词 */
+  kind: 'report' | 'custom'
+  prompt: string
+  /** 产出 issue 的标签 */
+  label: string
+  lastRunAt?: number
+  nextRunAt?: number
+  createdAt: number
+}
+
+export interface AgentHubSnapshot {
+  workspace: WorkspaceBrief
+  agents: AgentRoleBrief[]
+  squads: SquadBrief[]
+  issues: IssueBrief[]
+  runs: RunBrief[]
+  inbox: InboxItem[]
+  autopilots: AutopilotBrief[]
+  runtimes: Array<{ id: string; label: string; available: boolean; path?: string }>
+  /** EvoFlow 扩展 */
+  plans: PlanBrief[]
+  goals: GoalBrief[]
+  duty: DutySlot[]
+  apps: EvoApp[]
+  workspaces: WorkspaceDir[]
+  experiences: ExperienceCard[]
+  memories: AgentMemory[]
+  imChannels: ImChannel[]
+  sandboxRuns: SandboxRun[]
+}
+
+/* ---- 使用统计 / 数据看板 ---- */
+export interface ModelUsageStat {
+  calls: number
+  approxTokens: number
+  promptChars: number
+  lastUsedAt: number
+}
+
+export interface PageUsageStat {
+  visits: number
+  lastVisitedAt: number
+}
+
+export interface UsageStatsState {
+  version: 1
+  models: Record<string, ModelUsageStat>
+  pages: Record<string, PageUsageStat>
+  aiCalls: { chat: number; complete: number; rightClick: number; agentRun: number }
+  /** 按智能体统计（Multica：token per agent / issue） */
+  agents: Record<string, { runs: number; approxTokens: number; failures: number; lastRunAt: number }>
+  /** 按任务统计 */
+  issues: Record<string, { runs: number; approxTokens: number }>
+  startedAt: number
+  lastActiveAt: number
+}
+
+/** 设置页数据看板汇总 */
+export interface DashboardOverview {
+  usage: UsageStatsState
+  content: {
+    shortcuts: number
+    notes: number
+    automations: number
+    boards: number
+    novelProjects: number
+    novelChapters: number
+    dataTables: number
+    aiProfiles: number
+    stickies: number
+    dataDir: string
+    aiConfigured: boolean
+  }
+}
+
 /** 写作会话草稿（自动保存到本地） */
 export interface AiWritingDraft {
   sessionId: string
@@ -873,6 +1245,33 @@ export interface SceneDefaultKb {
   sceneDefaultKB: Record<string, string[]>
 }
 
+/* ---- # 引用选择器（范式 B：对话/写作输入区键入 # 挂载本地知识库） ---- */
+export type KbRefChannel = 'rag' | 'full-text' | 'schema'
+
+export interface KbRefPick {
+  kind: AssetType
+  /** doc=docId / data=assetId / worldbook=worldId */
+  id: string
+  name: string
+  channel: KbRefChannel
+}
+
+export interface KbCandidate {
+  kind: AssetType
+  id: string
+  name: string
+  /** 副标题：路径 / 表名 / 条目数 */
+  meta?: string
+  defaultChannel: KbRefChannel
+}
+
+export interface KbInjectBlock {
+  kind: AssetType
+  name: string
+  channel: KbRefChannel
+  text: string
+}
+
 /** 数据型资产的单个列定义 */
 export interface DataAssetColumn {
   /** 与底层数据表字段 id 对应 */
@@ -1080,6 +1479,10 @@ export interface NovelProjectMeta {
   chapterCount: number
   createdAt: number
   updatedAt: number
+  /** 已挂载的写作工作流 id（新建作品时自动挂载） */
+  workflowId?: string
+  /** 工作流已完成步骤 id 列表 */
+  workflowDone?: string[]
 }
 
 /** 分卷 */
@@ -1378,6 +1781,38 @@ export interface SkillRunResult {
   error?: string
 }
 
+/* ---- 写作工作流（新建作品自动挂载，傻瓜式逐步引导） ---- */
+
+/** 工作流步骤：可纯清单，也可绑定 Skill 一键运行 */
+export interface NovelWorkflowStep {
+  id: string
+  title: string
+  /** 步骤说明（作者该做什么） */
+  hint: string
+  /** 绑定的内置 Skill id；无则仅清单 */
+  skillId?: string
+  /** 期望产出落到哪里 */
+  produce?: 'synopsis' | 'entity' | 'volume' | 'chapter-outline' | 'chapter' | 'inspiration' | 'none'
+}
+
+/** 一套完整写作工作流（对标 NovelForge 雪花 / Vela 英雄之旅 / oh-story 网文流） */
+export interface NovelWorkflow {
+  id: string
+  name: string
+  description: string
+  /** 适合的题材标签，新建时按 genre 智能推荐 */
+  tags: string[]
+  steps: NovelWorkflowStep[]
+}
+
+/** 作品当前工作流状态（含进度） */
+export interface ProjectWorkflowState {
+  workflow: NovelWorkflow
+  done: string[]
+  /** 下一步（未完成的第一步） */
+  nextStepId: string | null
+}
+
 /** 写作 Skill 导出包（备份 / 迁移） */
 export interface SkillExportBundle {
   version: 1
@@ -1389,6 +1824,76 @@ export interface SkillExportBundle {
 export interface SkillImportResult {
   ok: boolean
   count: number
+  error?: string
+}
+
+/* ---- 文档查看器 ---- */
+export type DocKind =
+  | 'markdown'
+  | 'text'
+  | 'code'
+  | 'json'
+  | 'csv'
+  | 'html'
+  | 'pdf'
+  | 'image'
+  | 'office'
+  | 'spreadsheet'
+  | 'binary'
+
+export interface DocOpenResult {
+  ok: boolean
+  path?: string
+  name?: string
+  ext?: string
+  kind?: DocKind
+  text?: string
+  base64?: string
+  mime?: string
+  size?: number
+  error?: string
+  html?: string
+  note?: string
+  /** 原始文档类别（预览经过了格式转换时标记，如 pptx→pdf 预览则为 'slides'、xlsx→pdf 预览则为 'spreadsheet'） */
+  sourceKind?: 'slides' | 'spreadsheet'
+}
+
+/* ---- 文档手术式编辑（保真文本替换：只改 XML 文字节点，其余字节原样保留） ---- */
+
+/** 一个可编辑文本单元（段落/单元格/幻灯片文本框/XHTML 块） */
+export interface SurgicalUnit {
+  /** 稳定 id：`<zip条目>#<该条目内的序号>`，extract 与 apply 之间靠它对齐 */
+  id: string
+  /** 该单元的当前纯文本（已合并跨 run 拆分、已反转义） */
+  text: string
+  /** 单元类型：paragraph（DOCX/ODT）/ cell（XLSX/ODS）/ slide-text（PPTX）/ xhtml-block（EPUB） */
+  kind: 'paragraph' | 'cell' | 'slide-text' | 'xhtml-block'
+  /** 所在 zip 条目，如 word/document.xml / xl/sharedStrings.xml */
+  entry: string
+}
+
+export interface SurgicalExtractResult {
+  ok: boolean
+  format?: 'docx' | 'odt' | 'xlsx' | 'ods' | 'pptx' | 'odp' | 'epub'
+  units?: SurgicalUnit[]
+  error?: string
+  /** 编辑语义说明（如 DOC/XLS/RTF 的高保真转换编辑提示），供 UI 如实展示 */
+  note?: string
+}
+
+export interface SurgicalEdit {
+  id: string
+  /** 用户改后的完整单元文本（与 extract 返回的 text 全量对比，不同才写入） */
+  newText: string
+}
+
+export interface SurgicalApplyResult {
+  ok: boolean
+  /** 覆写前的备份文件路径（原路径 + .bak） */
+  backupPath?: string
+  changedCount?: number
+  /** 未能写回的单元及原因（如 id 失效、文本被外部修改后对不上） */
+  skipped?: Array<{ id: string; reason: string }>
   error?: string
 }
 

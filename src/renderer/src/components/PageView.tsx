@@ -4,6 +4,8 @@ import DataLab from '../pages/DataLab'
 import Boards from '../pages/Boards'
 import TextTools from '../pages/TextTools'
 import FileTools from '../pages/FileTools'
+import Toolbox from '../pages/Toolbox'
+import DocsViewer from '../pages/DocsViewer'
 import KnowledgeBase from '../pages/KnowledgeBase'
 import Stickies from '../pages/Stickies'
 import FeedCenter from '../pages/FeedCenter'
@@ -11,7 +13,7 @@ import Settings from '../pages/Settings'
 import Writing from '../pages/Writing'
 import Copywriting from '../pages/Copywriting'
 import GameUI from '../pages/GameUI'
-import Novel from '../pages/Novel'
+import AgentHub from '../pages/AgentHub'
 import Analytics from '../pages/Analytics'
 import type { PageKey } from '../nav'
 
@@ -22,8 +24,7 @@ import type { PageKey } from '../nav'
  * 融合后：
  *   - AI 助手 并入 自动工作台（dashboard）
  *   - 全网热点 与 智能体 收敛为统一情报流（hotspots → FeedCenter）
- *   - 'ai' / 'agents' 旧入口仍保留路由，用于 deep-link / 全局搜索兼容，
- *     其中 'agents' 直接进入情报流（不再切换到独立智能体 Tab）
+ *   - 'ai' / 'agents'：ai→工作台；agents→智能体任务中心（Multica 对标）
  */
 export interface PageViewProps {
   page: PageKey
@@ -48,9 +49,10 @@ export default function PageView({ page, id, action }: PageViewProps) {
       return <TextTools />
     case 'filetools':
       return <FileTools />
+    case 'toolbox':
+      return <Toolbox />
     case 'knowledge':
       return <KnowledgeBase />
-    case 'agents':
     case 'hotspots':
       return <FeedCenter />
     case 'stickies':
@@ -59,10 +61,17 @@ export default function PageView({ page, id, action }: PageViewProps) {
       return <Writing />
     case 'copywriting':
       return <Copywriting />
+    case 'docs':
+      return <DocsViewer />
     case 'gameui':
       return <GameUI />
+    case 'agents':
+      return <AgentHub />
     case 'novel':
-      return <Novel openChapterId={id} />
+      // 「长篇作品」已并入写作页（同一 WritingWorkspace）。保留本分支做重定向：
+      // 历史跳转、独立窗口 ?win=novel、旧设置残留都不会白屏；novelMode 让长篇用户
+      // 仍落在长篇三栏（章节树 / 正文 / 长篇工具），有 id 时直达指定章节。
+      return <Writing openChapterId={id} novelMode />
     case 'analytics':
       return <Analytics />
     case 'settings':

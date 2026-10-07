@@ -433,7 +433,10 @@ function BuildSection() {
   )
 }
 
+const GUIDE_KEY = 'kb-guide-dismissed-v1'
+
 export default function KnowledgeBase() {
+  const [guideOpen, setGuideOpen] = useState(() => localStorage.getItem(GUIDE_KEY) !== '1')
   return (
     <div className="dashboard-page">
       <div className="page-header">
@@ -443,7 +446,41 @@ export default function KnowledgeBase() {
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           全文检索索引 · Vision RAG（图片描述）· 知识库流水线（移植自 awesome-llm-apps RAG / Chat-with-Files）
         </Typography.Text>
+        {!guideOpen && (
+          <Button size="small" icon={<BookOutlined />} onClick={() => setGuideOpen(true)}>
+            使用引导
+          </Button>
+        )}
       </div>
+      {guideOpen && (
+        <Alert
+          type="info"
+          showIcon
+          closable
+          style={{ marginBottom: 12 }}
+          onClose={() => {
+            localStorage.setItem(GUIDE_KEY, '1')
+            setGuideOpen(false)
+          }}
+          message="三步上手本地知识库（全离线，数据不出本机）"
+          description={
+            <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+              <p style={{ margin: '2px 0' }}>
+                ① <b>建立索引</b>：选择一个文件夹（可含子目录）建立全文检索索引，支持 Markdown / TXT / PDF / DOCX 等文本类文件。索引完成后即可在「检索问答」中搜索。
+              </p>
+              <p style={{ margin: '2px 0' }}>
+                ② <b>知识库构建</b>（可选，批量进阶）：粘贴文件或目录路径批量纳入知识库——Office / PDF 等格式会自动经本地 LibreOffice / Pandoc 转换后索引；勾选「含图片」还会为图片生成视觉描述（Vision RAG），实现以图搜答。
+              </p>
+              <p style={{ margin: '2px 0' }}>
+                ③ <b>检索问答</b>：用自然语言提问，答案基于已索引内容生成并附带引用来源；历史问答可随时回看。
+              </p>
+              <p style={{ margin: '2px 0 0' }}>
+                🔒 全流程本地处理：文档内容与索引数据只保存在本机，不会上传到任何服务器。
+              </p>
+            </div>
+          }
+        />
+      )}
       <Tabs
         defaultActiveKey="ask"
         items={[

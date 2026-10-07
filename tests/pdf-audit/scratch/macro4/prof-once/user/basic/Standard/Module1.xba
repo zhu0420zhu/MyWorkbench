@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub ConvertOriented
+  Dim oDesk As Object, oDoc As Object, oStyles As Object
+  Dim oSheets As Object, oSheet As Object
+  Dim loadArgs(0) As New com.sun.star.beans.PropertyValue
+  Dim saveArgs(0) As New com.sun.star.beans.PropertyValue
+  Dim i As Integer
+  oDesk = createUnoService("com.sun.star.frame.Desktop")
+  loadArgs(0).Name = "Hidden"
+  loadArgs(0).Value = True
+  oDoc = oDesk.loadComponentFromURL("file:///D:/YM/MyWorkbench/tests/pdf-audit/scratch/macro4/src/sheet.xlsx", "_blank", 0, loadArgs())
+  oSheets = oDoc.Sheets
+  oStyles = oDoc.StyleFamilies.getByName("PageStyles")
+  For i = 0 To oSheets.Count - 1
+    oSheet = oSheets.getByIndex(i)
+    oSheet.PageStyle = "Default"
+  Next i
+  Dim sDef As Object
+  sDef = oStyles.getByName("Default")
+  sDef.Width = 29700
+  sDef.Height = 21000
+  saveArgs(0).Name = "FilterName"
+  saveArgs(0).Value = "calc_pdf_Export"
+  oDoc.storeToURL("file:///D:/YM/MyWorkbench/tests/pdf-audit/scratch/macro4/out.pdf", saveArgs())
+  oDoc.close(False)
+End Sub</script:module>

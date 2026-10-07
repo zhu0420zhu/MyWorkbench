@@ -1,0 +1,18 @@
+{
+  "preloadPath": "D:\\YM\\MyWorkbench\\out\\preload\\index.js",
+  "pagePath": "D:\\YM\\MyWorkbench\\tests\\pdf-audit\\qa\\probe-save-as\\index.html",
+  "openDialogs": [],
+  "saveDialogs": [
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例1.html",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例2",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例3.htm",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/对齐测试.doc",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/网页.pdf",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/无扩展名",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/已经是.txt",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/大小写.TXT",
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/纯空白文本观察.txt",
+    null,
+    "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/导出未对齐名.doc"
+  ]
+}

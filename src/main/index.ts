@@ -8,6 +8,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { spawn, type ChildProcess } from 'child_process'
+import { pathToFileURL } from 'url'
 import { existsSync } from 'fs'
 import { promises as fs } from 'fs'
 import type { AiChatMessage, AiTool } from '../shared/types'
@@ -37,7 +38,7 @@ import {
   type StickyPanelMode
 } from './stickyPanel'
 import { translateText, TRANSLATE_LANGS } from './translate'
-import { readAiConfig, saveAiConfig, chat, stopChat, complete, testAiConnection } from './ai'
+import { readAiConfig, saveAiConfig, chat, stopChat, complete, testAiConnection, listAiProfiles, addAiProfile, addOllamaProfile, updateAiProfile, removeAiProfile, setActiveAiProfile, testAiProfile, getRouting, setRouting, listEndpointModels } from './ai'
 import { dataInfo, backupData, importData, getDataDirSetting, setDataDirSetting, applyCustomDataDir, pickDir } from './data'
 import {
   aggregateTable,
@@ -61,16 +62,27 @@ import { registerToolsIpc } from './toolsIpc'
 import { registerPublishIpc } from './publishIpc'
 import { registerOrganizeIpc } from './organize/organizeIpc'
 import { registerConvertIpc } from './convert/convertIpc'
+import { getTempCleaner } from './convert/tempCleaner'
+import { registerMediaIpc } from './media/mediaIpc'
+import { registerHardwareIpc } from './hardware/hardwareIpc'
+import { registerPdfIpc } from './pdf/pdfIpc'
 import { registerSearchIndexIpc } from './searchIndex/searchIndexIpc'
 import { registerKnowledgeBaseIpc } from './knowledgeBase/knowledgeBaseIpc'
 import { registerKbDataIpc } from './kbDataIpc'
 import { registerMcpIpc } from './mcp/mcpIpc'
 import { registerNotesFeatureIpc } from './notesFeature/notesFeatureIpc'
 import { registerNovelIpc } from './novel/novelIpc'
+import { listProjects, getProject } from './novel/store'
+import { registerDocsIpc } from './docsIpc'
+import { registerSurgicalIpc } from './docs/surgical/surgicalIpc'
+import { registerPptIpc } from './ppt/pptConvert'
+import { registerAgentsHubIpc } from './agentsHub/ipc'
 import { registerSillyTavernIpc } from './sillytavern/sillytavernIpc'
 import { registerFeedIpc } from './feed/feedIpc'
 import { getFeedService } from './feed/feedService'
 import { getPrefs, setPrefs } from './prefs'
+import { getLogger, installGlobalErrorHandlers } from './tools/logger'
+import { loadUsageStats, recordPageVisit, resetUsageStats } from './usageStats'
 import {
   listSnapshots,
   createSnapshot,
@@ -107,11 +119,8 @@ import {
   hasPageWindow
 } from './pageWindows'
 
-// 全局兜底：各 store 的写入函数多为裸 fs 调用（无本地 try/catch），若调用方未
-// 捕获会导致未处理的 rejection。统一在这里记录，避免静默丢失或拖垮进程。
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason)
-})
+// 全局兜底：uncaughtException / unhandledRejection 统一写入 userData/logs
+installGlobalErrorHandlers()
 
 const CACHE_DIRS = [
   'Cache',
@@ -385,12 +394,70 @@ function registerIpc(): void {
   ipcMain.handle('ai:get-config', () => readAiConfig())
   ipcMain.handle('ai:save-config', (_e, cfg) => saveAiConfig(cfg))
   ipcMain.handle('ai:test-connection', () => testAiConnection())
+  ipcMain.handle('ai:list-profiles', () => listAiProfiles())
+  ipcMain.handle('ai:add-profile', (_e, input) => addAiProfile(input))
+  ipcMain.handle('ai:update-profile', (_e, id: string, patch) => updateAiProfile(id, patch))
+  ipcMain.handle('ai:remove-profile', (_e, id: string) => removeAiProfile(id))
+  ipcMain.handle('ai:set-active-profile', (_e, id: string) => setActiveAiProfile(id))
+  ipcMain.handle('ai:test-profile', (_e, cfg) => testAiProfile(cfg))
+  ipcMain.handle('ai:list-models', (_e, endpoint: string, apiKey?: string) => listEndpointModels(endpoint, apiKey))
+  ipcMain.handle('ai:add-ollama', (_e, opts?: { endpoint?: string; model?: string; name?: string }) => addOllamaProfile(opts))
+  ipcMain.handle('ai:get-routing', () => getRouting())
+  ipcMain.handle('ai:set-routing', (_e, r) => setRouting(r))
+
+  ipcMain.handle('usage:page-visit', (_e, page: string) => recordPageVisit(page))
+  ipcMain.handle('usage:reset', () => resetUsageStats())
+  ipcMain.handle('usage:dashboard', async () => {
+    const usage = await loadUsageStats()
+    const [shortcuts, notes, automations, cfg, boardsMeta, novelList, stickies, profiles] = await Promise.all([
+      listShortcuts(),
+      listNotes(),
+      listAutomations(),
+      readAiConfig(),
+      listBoards().catch(() => []),
+      listProjects().catch(() => []),
+      listStickies().catch(() => []),
+      listAiProfiles().catch(() => ({ activeId: '', profiles: [] }))
+    ])
+    let tables = 0
+    try {
+      tables = (await listTables()).length
+    } catch {
+      tables = 0
+    }
+    let chapters = 0
+    try {
+      for (const p of novelList) {
+        const full = await getProject(p.id)
+        chapters += full?.chapters.length ?? 0
+      }
+    } catch {
+      /* ignore */
+    }
+    return {
+      usage,
+      content: {
+        shortcuts: shortcuts.length,
+        notes: notes.length,
+        automations: automations.length,
+        boards: boardsMeta.length,
+        novelProjects: novelList.length,
+        novelChapters: chapters,
+        dataTables: tables,
+        aiProfiles: profiles.profiles.length,
+        stickies: stickies.length,
+        dataDir: app.getPath('userData'),
+        aiConfigured: Boolean(cfg.endpoint)
+      }
+    }
+  })
   ipcMain.handle('ai:chat', (event, sessionId: string, messages, modelOverride?: string, tools?: AiTool[], sampling?: Record<string, number | string | boolean>) =>
     chat(event.sender, sessionId, messages, modelOverride, tools, sampling)
   )
   ipcMain.handle('ai:complete', (_e, messages: AiChatMessage[], modelOverride?: string) =>
     complete(messages, modelOverride ? { modelOverride } : undefined)
   )
+  // (removed duplicate ai:complete)
   ipcMain.handle('ai:stop', (_e, sessionId: string) => stopChat(sessionId))
 
   ipcMain.handle('data:info', () => dataInfo())
@@ -457,6 +524,55 @@ function registerIpc(): void {
 
   ipcMain.handle('prefs:get', () => getPrefs())
   ipcMain.handle('prefs:set', (_e, prefs) => setPrefs(prefs))
+
+  /** 选择自定义壁纸图：复制到 userData/wallpapers，返回持久化绝对路径 */
+  ipcMain.handle('prefs:pick-wallpaper', async (event): Promise<{ ok: boolean; path?: string; error?: string }> => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const opts = {
+      title: '选择壁纸图片',
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+      properties: ['openFile' as const]
+    }
+    const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (result.canceled || !result.filePaths[0]) return { ok: false, error: 'cancelled' }
+    try {
+      const src = result.filePaths[0]
+      const dir = join(app.getPath('userData'), 'wallpapers')
+      await fs.mkdir(dir, { recursive: true })
+      const ext = src.slice(src.lastIndexOf('.'))
+      const dest = join(dir, `wp-${Date.now()}${ext}`)
+      await fs.copyFile(src, dest)
+      return { ok: true, path: dest }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  /** 壁纸路径 → data URL（CSP img-src 限制 file://，改走 base64 更稳） */
+  ipcMain.handle('prefs:wallpaper-url', async (_e, path: string): Promise<string> => {
+    if (!path) return ''
+    try {
+      const buf = await fs.readFile(path)
+      const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+      const mime =
+        ext === 'png'
+          ? 'image/png'
+          : ext === 'webp'
+            ? 'image/webp'
+            : ext === 'gif'
+              ? 'image/gif'
+              : ext === 'bmp'
+                ? 'image/bmp'
+                : 'image/jpeg'
+      return `data:${mime};base64,${buf.toString('base64')}`
+    } catch {
+      try {
+        return pathToFileURL(path).href
+      } catch {
+        return ''
+      }
+    }
+  })
 
   ipcMain.handle('ai:memory-load', () => loadMemory())
   ipcMain.handle('ai:memory-save', (_e, memory) => saveMemory(memory))
@@ -605,6 +721,16 @@ app.whenReady().then(async () => {
   registerPublishIpc()
   registerOrganizeIpc()
   registerConvertIpc()
+  // 启动时自动清理过期的转换临时目录（此前仅手动 IPC 可触发，长期会泄漏磁盘）。
+  // 异步触发不阻塞启动；失败记日志，不静默吞。
+  void Promise.resolve()
+    .then(() => getTempCleaner().cleanupExpired())
+    .catch((err) =>
+      getLogger('convert').warning(`启动临时目录清理失败: ${err instanceof Error ? err.message : String(err)}`)
+    )
+  registerMediaIpc()
+  registerHardwareIpc()
+  registerPdfIpc()
   registerSearchIndexIpc()
   registerFeedIpc()
   getFeedService().start()
@@ -614,6 +740,10 @@ app.whenReady().then(async () => {
   registerNotesFeatureIpc()
   registerSillyTavernIpc()
   registerNovelIpc()
+  registerDocsIpc()
+  registerSurgicalIpc()
+  registerPptIpc()
+  registerAgentsHubIpc()
   createWindow()
 
   app.on('activate', () => {

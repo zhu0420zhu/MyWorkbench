@@ -84,11 +84,29 @@ import {
   readChapterContent,
   type CreateProjectInput
 } from './store'
+import {
+  attachWorkflowToProject,
+  getProjectWorkflow,
+  listWorkflows,
+  setWorkflowStepDone,
+  switchProjectWorkflow,
+  seedAllWorkflowSkills
+} from './workflow'
 
 export function registerNovelIpc(): void {
   // ---- 作品 ----
   ipcMain.handle('novel:list-projects', () => listProjects())
-  ipcMain.handle('novel:create-project', (_e, input: CreateProjectInput) => createProject(input))
+  ipcMain.handle('novel:create-project', async (_e, input: CreateProjectInput) => {
+    const p = await createProject(input)
+    // 傻瓜式：新建即挂载工作流（按题材推荐或用户指定），并播种配套 Skill
+    try {
+      await attachWorkflowToProject(p.meta.id, input.genre, input.workflowId)
+      const full = await getProject(p.meta.id)
+      return full ?? p
+    } catch {
+      return p
+    }
+  })
   ipcMain.handle('novel:get-project', (_e, projectId: string) => getProject(projectId))
   ipcMain.handle(
     'novel:update-project',
@@ -96,6 +114,17 @@ export function registerNovelIpc(): void {
       updateProject(projectId, patch)
   )
   ipcMain.handle('novel:remove-project', (_e, projectId: string) => removeProject(projectId))
+
+  // ---- 工作流 ----
+  ipcMain.handle('novel:list-workflows', () => listWorkflows())
+  ipcMain.handle('novel:get-workflow', (_e, projectId: string) => getProjectWorkflow(projectId))
+  ipcMain.handle('novel:workflow-step-done', (_e, projectId: string, stepId: string, done: boolean) =>
+    setWorkflowStepDone(projectId, stepId, done)
+  )
+  ipcMain.handle('novel:switch-workflow', (_e, projectId: string, workflowId: string) =>
+    switchProjectWorkflow(projectId, workflowId)
+  )
+  ipcMain.handle('novel:seed-workflow-skills', () => seedAllWorkflowSkills())
 
   // ---- 分卷 ----
   ipcMain.handle('novel:create-volume', (_e, projectId: string, title: string, summary?: string) =>

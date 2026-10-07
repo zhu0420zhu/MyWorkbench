@@ -52,6 +52,10 @@ interface Props {
   hideExtras?: boolean
   /** 提示词记录来源：传入后自动将每次发送沉淀到本地提示词库，并展示「记录」入口 */
   promptSource?: 'ai' | 'writing'
+  /** 底栏额外操作（如「引用知识库」按钮），渲染在模型选择左侧 */
+  extraActions?: React.ReactNode
+  /** 紧凑模式：隐藏长 intro，输入框铺满父容器高度（写作页用） */
+  compact?: boolean
 }
 
 /** 内置技能：写作对话常用预设（注入 system hint） */
@@ -89,7 +93,9 @@ export default function ComposerInput({
   disabled,
   placeholder = '输入消息，Enter 发送，Shift+Enter 换行',
   hideExtras = false,
-  promptSource
+  promptSource,
+  extraActions,
+  compact = false
 }: Props) {
   const [popOpen, setPopOpen] = useState(false)
   const [loadedTools, setLoadedTools] = useState<McpToolInfo[]>([])
@@ -195,17 +201,25 @@ export default function ComposerInput({
 
   return (
     <div
+      className={`composer-input${compact ? ' composer-input-compact' : ''}`}
       style={{
         background: 'var(--bg-elevated, #fff)',
         border: '1px solid var(--border-color, rgba(0,0,0,.08))',
-        borderRadius: 16,
-        padding: '14px 16px 10px',
-        boxShadow: '0 1px 2px rgba(0,0,0,.04)'
+        borderRadius: 14,
+        padding: compact ? '10px 12px 8px' : '14px 16px 10px',
+        boxShadow: '0 1px 3px rgba(0,0,0,.05)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        width: '100%',
+        minHeight: 0,
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
-      {intro && (
-        <div style={{ marginBottom: 10 }}>
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+      {intro && !compact && (
+        <div style={{ marginBottom: 8, flexShrink: 0 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12, lineHeight: 1.5 }}>
             {intro}
           </Typography.Text>
         </div>
@@ -225,15 +239,17 @@ export default function ComposerInput({
         }}
         style={{
           width: '100%',
-          minHeight: 56,
-          maxHeight: 200,
+          flex: 1,
+          minHeight: compact ? 64 : 48,
           resize: 'none',
           border: 'none',
           outline: 'none',
           background: 'transparent',
           fontSize: 14,
-          lineHeight: 1.6,
-          color: 'inherit'
+          lineHeight: 1.65,
+          color: 'inherit',
+          padding: '4px 0 8px',
+          overflow: 'auto'
         }}
       />
 
@@ -358,6 +374,8 @@ export default function ComposerInput({
         )}
 
         <div style={{ flex: 1 }} />
+
+        {extraActions}
 
         <Select
           aria-label="主模型"

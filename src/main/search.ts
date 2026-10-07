@@ -2,30 +2,43 @@ import { listShortcuts } from './shortcuts'
 import { listNotes } from './notes'
 import { listAutomations } from './automations'
 import type { SearchResult, AppCommand } from '../shared/types'
+import { pageLabelOf } from '../shared/pageMeta'
 
 interface NavEntry {
   page: string
-  title: string
   keywords: string
 }
 
-const PAGES: NavEntry[] = [
-  { page: 'dashboard', title: '自动工作台', keywords: 'dashboard home 主页 工作台 首页 ai 助手 对话 问答 智能多媒体' },
-  { page: 'knowledge', title: '本地知识库', keywords: 'knowledge 知识库 检索 rag 文档 智能多媒体' },
-  { page: 'filetools', title: '文件工具', keywords: 'file tools 文件 整理 转换 清理 智能工具' },
-  { page: 'notes', title: '笔记', keywords: 'note 笔记 记录 备忘' },
-  { page: 'stickies', title: '便利贴', keywords: 'sticky 便利贴 便签 贴纸' },
-  { page: 'database', title: '数据整理', keywords: 'data 数据库 表格 看板 统计' },
-  { page: 'analytics', title: '数据分析', keywords: 'analytics 图表 统计 csv echarts 可视化 数据 分析' },
-  { page: 'boards', title: '白板', keywords: 'board 白板 画布 绘图' },
-  { page: 'texttools', title: '文本工具', keywords: 'text 文本 批处理 ocr 翻译 智能工具' },
-  { page: 'hotspots', title: '情报中心', keywords: 'hot media 多媒体 热点 热点跟进 agent 智能体 代理 常驻 智能多媒体 情报中心' },
-  { page: 'settings', title: '设置', keywords: 'setting 设置 配置 偏好' },
-  { page: 'writing', title: '写作', keywords: 'writing 写作 写稿 创作 编辑 笔记 文本 润色' },
-  { page: 'copywriting', title: '文案', keywords: 'copy 文案 营销 推广 宣传 带货 小红书 公众号 热点分发' },
-  { page: 'gameui', title: '游戏UI设计', keywords: 'game ui 游戏 界面 设计 sprite 雪碧图 拆分 原型 交互 整页' },
-  { page: 'novel', title: '长篇作品', keywords: 'novel 长篇 小说 作品 章节 角色 设定 世界观 伏笔' }
+/**
+ * 命令面板收录的页面与搜索关键词。
+ *
+ * title 不在此硬编码 —— 统一由 @shared/pageMeta 的 PAGE_LABELS 提供。
+ * 此前该名表在 navItems.tsx / pageWindows.ts / 本文件 / Settings.tsx 各维护一份，
+ * 2026-09-28 审计发现 novel 只在部分清单中存在，故收敛为单一来源。
+ */
+const PAGE_KEYWORDS: NavEntry[] = [
+  { page: 'dashboard', keywords: 'dashboard home 主页 工作台 首页 ai 助手 对话 问答 智能多媒体' },
+  { page: 'knowledge', keywords: 'knowledge 知识库 检索 rag 文档 智能多媒体' },
+  { page: 'filetools', keywords: 'file tools 文件 整理 转换 清理 image 图片 图像 裁剪 抠图 背景 颜色 压缩 拼接 图标 video 视频 音频 gif 单帧 抽帧 剪辑 提取 ffmpeg hardware 硬件 cpu 内存 显卡 磁盘 网络 电池 传感器 剪贴板 智能工具' },
+  { page: 'toolbox', keywords: '开发工具箱 toolbox uuid jwt hash 密码 时间戳 房贷 利息 配色 打字 图标 智能工具 文件工具' },
+  { page: 'notes', keywords: 'note 笔记 记录 备忘' },
+  { page: 'stickies', keywords: 'sticky 便利贴 便签 贴纸' },
+  { page: 'database', keywords: 'data 数据库 表格 看板 统计' },
+  { page: 'analytics', keywords: 'analytics 图表 统计 csv echarts 可视化 数据 分析' },
+  { page: 'boards', keywords: 'board 白板 画布 绘图' },
+  { page: 'texttools', keywords: 'text 文本 批处理 ocr 翻译 智能工具' },
+  { page: 'hotspots', keywords: 'hot media 多媒体 热点 热点跟进 agent 智能体 代理 常驻 智能多媒体 情报中心' },
+  { page: 'agents', keywords: 'agent 智能体 任务 看板 小队 审核 执行日志 autopilot' },
+  { page: 'settings', keywords: 'setting 设置 配置 偏好' },
+  // 长篇作品已并入写作页（唯一入口），关键词一并并入，命令面板搜「长篇/小说/分卷」仍能命中写作页
+  { page: 'writing', keywords: 'writing 写作 写稿 创作 编辑 笔记 文本 润色 novel 长篇 小说 作品 章节 设定 世界观 伏笔 分卷' },
+  { page: 'copywriting', keywords: 'copy 文案 营销 推广 宣传 带货 小红书 公众号 热点分发' },
+  { page: 'docs', keywords: 'docs 文档 处理 查看 预览 编辑 打印 pdf md markdown docx ppt pptx 合并 拆分 旋转 页码 加密 解密 压缩 提取 excel 文件' }
+  // { page: 'gameui', keywords: 'game ui 游戏 界面 设计 sprite 雪碧图 拆分 原型 交互 整页' },
 ]
+
+/** 页面 + 统一中文名，供 searchAll 直接消费 */
+const PAGES = PAGE_KEYWORDS.map((e) => ({ ...e, title: pageLabelOf(e.page) }))
 
 interface CommandEntry {
   command: AppCommand
@@ -56,7 +69,7 @@ export async function searchAll(query: string): Promise<SearchResult[]> {
   if (!q) {
     const def: SearchResult[] = []
     for (const p of PAGES) {
-      if (p.page === 'knowledge' || p.page === 'filetools' || p.page === 'dashboard' || p.page === 'writing' || p.page === 'copywriting' || p.page === 'gameui' || p.page === 'novel' || p.page === 'analytics') {
+      if (p.page === 'knowledge' || p.page === 'filetools' || p.page === 'dashboard' || p.page === 'writing' || p.page === 'copywriting' || p.page === 'analytics') {
         def.push({ kind: 'page', id: 'page:' + p.page, title: p.title, subtitle: '页面', page: p.page })
       }
     }

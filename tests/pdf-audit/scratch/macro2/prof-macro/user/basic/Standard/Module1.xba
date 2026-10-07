@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub ConvertOriented
+  Dim oDesk As Object, oDoc As Object, oStyles As Object, oStyle As Object
+  Dim oSheets As Object, oSheet As Object
+  Dim loadArgs(0) As New com.sun.star.beans.PropertyValue
+  Dim saveArgs(0) As New com.sun.star.beans.PropertyValue
+  Dim i As Integer, f As Integer
+  f = FreeFile
+  Open "D:\YM\MyWorkbench\tests\pdf-audit\scratch\macro2\diag.txt" For Output As #f
+  On Error Goto ErrH
+  oDesk = createUnoService("com.sun.star.frame.Desktop")
+  loadArgs(0).Name = "Hidden"
+  loadArgs(0).Value = True
+  oDoc = oDesk.loadComponentFromURL("file:///D:/YM/MyWorkbench/tests/pdf-audit/scratch/macro2/src/sheet.xlsx", "_blank", 0, loadArgs())
+  Print #f, "loaded"
+  oSheets = oDoc.Sheets
+  Print #f, "sheets=" & oSheets.Count
+  For i = 0 To oSheets.Count - 1
+    oSheet = oSheets.getByIndex(i)
+    Print #f, "sheet " & i & " pagestyle=" & oSheet.PageStyle
+  Next i
+  oStyles = oDoc.StyleFamilies.getByName("PageStyles")
+  Print #f, "pageStyles=" & oStyles.Count
+  For i = 0 To oStyles.Count - 1
+    oStyle = oStyles.getByIndex(i)
+    Print #f, "style " & i & " name=" & oStyle.Name & " landscape=" & oStyle.IsLandscape
+    oStyle.IsLandscape = True
+    Print #f, "  set -> landscape=" & oStyle.IsLandscape
+  Next i
+  For i = 0 To oSheets.Count - 1
+    oSheet = oSheets.getByIndex(i)
+    oSheet.PageStyle = oSheet.PageStyle
+  Next i
+  saveArgs(0).Name = "FilterName"
+  saveArgs(0).Value = "calc_pdf_Export"
+  oDoc.storeToURL("file:///D:/YM/MyWorkbench/tests/pdf-audit/scratch/macro2/out.pdf", saveArgs())
+  Print #f, "stored"
+  oDoc.close(False)
+  Close #f
+  Exit Sub
+ErrH:
+  Print #f, "ERROR " & Err & " " & Error$ & " at line " & Erl
+  Close #f
+End Sub</script:module>

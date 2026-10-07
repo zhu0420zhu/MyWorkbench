@@ -19,6 +19,13 @@ export interface CharacterCard {
   creator: string
   character_version: string
   extensions: Record<string, unknown>
+  /**
+   * 未知顶层字段的留存位（非 V2 契约、但导入卡里存在的顶层键，如 SillyTavern 的
+   * character_book 内嵌世界书 / group_only_greetings / creation_date 等）。
+   * 仅存储层自洽用：parseCardJson 读取时收集不认识的顶层键，cardToJson 序列化时
+   * 展平回顶层，保证「读取 → 保存」往返零损；该键本身不会写进最终文件。
+   */
+  __extra?: Record<string, unknown>
 }
 
 /** 磁盘角色卡元信息 */

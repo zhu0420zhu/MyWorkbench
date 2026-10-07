@@ -158,13 +158,26 @@ export default function EntityDrawer({
   const saveRef = useRef(saveNow)
   saveRef.current = saveNow
 
+  // 兜底保存失败只提示一次：快速切换实体 / 连续失败时不刷屏，成功保存后复位
+  const autoSaveErrNotifiedRef = useRef(false)
+
   // 切换实体 / 卸载时兜底保存：用进入 effect 时捕获的 id，不读"当前选中"
   useEffect(() => {
     if (!entityId) return
     const idAtMount = entityId
     return () => {
       if (idAtMount && dirtyRef.current && formRef.current) {
-        void saveRef.current(idAtMount, formRef.current).catch(() => undefined)
+        void saveRef
+          .current(idAtMount, formRef.current)
+          .then(() => {
+            autoSaveErrNotifiedRef.current = false
+          })
+          .catch(() => {
+            if (!autoSaveErrNotifiedRef.current) {
+              autoSaveErrNotifiedRef.current = true
+              message.error('自动保存失败，请重试')
+            }
+          })
       }
     }
   }, [entityId])

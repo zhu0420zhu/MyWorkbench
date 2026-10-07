@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Layout, Button, Tooltip, theme as antdTheme, message } from 'antd'
 import {
   SunOutlined,
@@ -10,11 +10,14 @@ import {
 import TitleBar from './components/TitleBar'
 import SearchModal from './components/SearchModal'
 import CollapsibleMenu, { type CollapsibleMenuGroup } from './components/CollapsibleMenu'
+import VScrollIndicator from './components/VScrollIndicator'
 import StickyPanelWindow from './components/StickyPanelWindow'
 import PageWindowShell from './components/PageWindowShell'
 import PageView from './components/PageView'
 import WindowResizeHandles from './components/WindowResizeHandles'
 import ConfirmCloseDialog from './components/ConfirmCloseDialog'
+import WallpaperLayer, { useZoneChrome, zoneWallpaperBackground } from './components/WallpaperLayer'
+import AiSelectMenu from './components/ai/AiSelectMenu'
 import { NAV } from './navItems'
 import { useTheme, resolveAccent } from './theme/theme'
 import { useNav, type PageKey } from './nav'
@@ -41,7 +44,7 @@ const ALT_PAGES: PageKey[] = [
   'notes',
   'database',
   'analytics',
-  'gameui',
+  // 'gameui',
   'settings'
 ]
 
@@ -64,10 +67,56 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [menuCollapsed, setMenuCollapsed] = useState(false)
+  /** 侧边栏垂直移动条：定位菜单滚动容器（.cm） */
+  const menuWrapRef = useRef<HTMLDivElement>(null)
+  const [menuScrollEl, setMenuScrollEl] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setMenuScrollEl((menuWrapRef.current?.querySelector('.cm') as HTMLElement | null) ?? null)
+  }, [menuCollapsed, collapsed])
   const { isDark, toggle } = useTheme()
   const { target, navigate } = useNav()
+  // 页面访问统计（设置 → 数据看板）
+  useEffect(() => {
+    if (!target.page) return
+    void window.api.usage.pageVisit(target.page)
+  }, [target.page])
   const { prefs } = usePrefs()
   const { token } = antdTheme.useToken()
+  const siderZone = useZoneChrome('sider')
+  const [siderImg, setSiderImg] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    const path = siderZone.imagePath
+    if (!siderZone.enabled || siderZone.mode !== 'image' || !path) {
+      setSiderImg('')
+      return
+    }
+    void window.api.prefs
+      .wallpaperUrl(path)
+      .then((u) => {
+        if (alive) setSiderImg(u)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [siderZone.enabled, siderZone.mode, siderZone.imagePath])
+
+  const siderBg = useMemo(() => {
+    if (!siderZone.enabled) return undefined
+    return zoneWallpaperBackground(
+      siderZone.mode,
+      isDark,
+      siderZone.c1,
+      siderZone.c2,
+      siderZone.mode === 'image' ? siderImg : undefined
+    )
+  }, [siderZone, isDark, siderImg])
+  const contentRootRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    contentRootRef.current = document.body
+  }, [])
 
   // 主题色同步到 CSS 变量：antd token 之外的自定义样式（菜单选中态/徽标/色标/快捷卡片等）跟随用户主色；
   // 未显式选择时按主题回落到设计稿默认色（浅色石青 / 暗色冷青蓝）
@@ -82,9 +131,9 @@ export default function App() {
       return { key, label: m?.label ?? key, icon: m?.icon, onClick: () => navigate({ page: key }) }
     }
     return [
-      { key: 'g-ai', label: '智能情报', accent: GROUP_ACCENT['智能情报'], children: [leaf('dashboard'), leaf('knowledge'), leaf('hotspots')] },
-      { key: 'g-content', label: '内容创作', accent: GROUP_ACCENT['内容创作'], children: [leaf('writing'), leaf('copywriting'), leaf('notes'), leaf('stickies'), leaf('boards'), leaf('gameui')] },
-      { key: 'g-filedata', label: '智能工具', accent: GROUP_ACCENT['智能工具'], children: [leaf('filetools'), leaf('texttools'), leaf('database'), leaf('analytics')] },
+      { key: 'g-ai', label: '智能情报', accent: GROUP_ACCENT['智能情报'], children: [leaf('dashboard'), leaf('knowledge'), leaf('hotspots'), leaf('agents')] },
+      { key: 'g-content', label: '内容创作', accent: GROUP_ACCENT['内容创作'], children: [leaf('docs'), leaf('writing'), leaf('copywriting'), leaf('notes'), leaf('stickies'), leaf('boards')/* , leaf('gameui') */] },
+      { key: 'g-filedata', label: '智能工具', accent: GROUP_ACCENT['智能工具'], children: [leaf('filetools'), leaf('texttools'), leaf('toolbox'), leaf('database'), leaf('analytics')] },
       { key: 'g-system', label: '系统', accent: GROUP_ACCENT['系统'], children: [leaf('settings')] }
     ]
   }, [navigate])
@@ -212,17 +261,25 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
+    <>
+      {/* 氛境壁纸：固定底层，侧栏玻璃化后可透出 */}
+      <WallpaperLayer />
+      <div className="app-root">
       <TitleBar page={target.page} pageId={target.id} />
       <Layout style={{ flex: 1, minHeight: 0 }}>
         <Sider
           width={200}
           collapsedWidth={64}
           collapsed={collapsed}
+          className="app-sider"
+          data-wp-zone={siderZone.enabled ? siderZone.mode : 'off'}
           style={{
-            background: token.colorBgContainer,
+            background: siderZone.enabled && siderBg && siderBg !== 'transparent' ? siderBg : 'transparent',
+            backgroundSize: siderZone.mode === 'image' ? 'cover' : undefined,
+            backgroundPosition: 'center',
             borderRight: `1px solid ${token.colorBorderSecondary}`,
-            position: 'relative'
+            position: 'relative',
+            opacity: siderZone.enabled ? Math.max(0.72, siderZone.opacity) : undefined
           }}
         >
           <div
@@ -254,12 +311,15 @@ export default function App() {
               </Tooltip>
             )}
           </div>
-          <CollapsibleMenu
-            groups={MENU_GROUPS}
-            activeKey={target.page}
-            collapsed={menuCollapsed}
-            rail={collapsed}
-          />
+          <div ref={menuWrapRef} style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <CollapsibleMenu
+              groups={MENU_GROUPS}
+              activeKey={target.page}
+              collapsed={menuCollapsed}
+              rail={collapsed}
+            />
+            <VScrollIndicator target={menuScrollEl} />
+          </div>
           <div
             className="sider-actions"
             style={{
@@ -294,7 +354,7 @@ export default function App() {
             </Tooltip>
           </div>
         </Sider>
-        <Layout style={{ background: 'var(--app-bg)' }}>
+        <Layout style={{ background: 'transparent' }}>
           <Content style={{ height: '100%', overflow: 'auto' }}>
             <div key={target.page} className="page-enter">
               <PageView page={target.page} id={target.id} action={target.action} />
@@ -303,11 +363,14 @@ export default function App() {
         </Layout>
       </Layout>
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} onPick={handlePick} />
+      {/* 选中文本右键 → AI：写作 / 文案 / 笔记 / 文档处理 等全页面可用 */}
+      <AiSelectMenu rootRef={contentRootRef} enabled />
       {/* 无边框窗口：八向边角拖拽缩放热区（最大化/全屏时组件内部自动不渲染） */}
       <WindowResizeHandles />
       {/* 关闭确认：最小化到后台 / 直接退出，可勾选不再提示 */}
       <ConfirmCloseDialog />
-    </div>
+      </div>
+    </>
   )
 }
 

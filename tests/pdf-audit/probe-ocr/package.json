@@ -1,0 +1,7 @@
+{
+  "name": "pdf-audit-probe-ocr",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "description": "探针：在真实 Chromium（Electron 渲染进程）中验证「PDF 提取 → 面板内 OCR」全链路（jsep wasm + 生产模型文件）。"
+}

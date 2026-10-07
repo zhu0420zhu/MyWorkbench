@@ -2,30 +2,23 @@ import { app, BrowserWindow, dialog, net } from 'electron'
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import type { OcrImageInfo } from '../shared/types'
-
-const MODEL_NAMES = [
-  'ch_PP-OCRv4_det_infer.onnx',
-  'ch_PP-OCRv4_rec_infer.onnx',
-  'ch_ppocr_mobile_v2.0_cls_infer.onnx',
-  'slanet-plus.onnx' // 表格结构识别（resources/ 打包）
-]
-
-const WASM_NAMES = [
-  'ort-wasm-simd.wasm',
-  'ort-wasm-simd-threaded.wasm',
-  'ort-wasm.wasm',
-  'ort-wasm-simd-threaded.jsep.wasm'
-]
+import {
+  MODEL_NAMES,
+  WASM_NAMES,
+  resourcesRoot,
+  modelDirCandidates,
+  wasmDirCandidates,
+  devModelsDir,
+  devWasmDir,
+  readFirstFile,
+  type OcrEnv
+} from './ocrPaths'
 
 const DICT_URL =
   'https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/main/ppocr/utils/ppocr_keys_v1.txt'
 
-function modelsDir(): string {
-  return join(app.getAppPath(), 'node_modules', 'paddle-ocr-onnx-models', 'models')
-}
-
-function wasmDir(): string {
-  return join(app.getAppPath(), 'node_modules', 'onnxruntime-web', 'dist')
+function ocrEnv(): OcrEnv {
+  return { isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }
 }
 
 function dictFile(): string {
@@ -34,9 +27,7 @@ function dictFile(): string {
 
 /** 打包资源路径：dev 用项目 resources/，打包后用 process.resourcesPath/resources/ */
 function resourcePath(name: string): string {
-  return app.isPackaged
-    ? join(process.resourcesPath, 'resources', name)
-    : join(app.getAppPath(), 'resources', name)
+  return join(resourcesRoot(ocrEnv()), name)
 }
 
 async function ensureDict(): Promise<string> {
@@ -66,31 +57,22 @@ async function ensureDict(): Promise<string> {
 
 export async function readModel(name: string): Promise<Uint8Array | null> {
   if (!MODEL_NAMES.includes(name)) return null
-  // SLANet 等打包模型优先从 resources 读，PP-OCR 模型从 node_modules 读
-  try {
-    const bundled = resourcePath(name)
-    await fs.access(bundled)
-    const buf = await fs.readFile(bundled)
-    return new Uint8Array(buf)
-  } catch {
-    /* 回退 node_modules */
-  }
-  try {
-    const buf = await fs.readFile(join(modelsDir(), name))
-    return new Uint8Array(buf)
-  } catch {
-    return null
-  }
+  const env = ocrEnv()
+  // 打包资源（resources/ocr-models/ 子目录优先，兼容扁平 resources/）
+  const bundled = await readFirstFile(modelDirCandidates(env), name)
+  if (bundled) return bundled
+  // 开发态回退：node_modules/paddle-ocr-onnx-models/models
+  return readFirstFile([devModelsDir(env.appPath)], name)
 }
 
 export async function readWasm(name: string): Promise<Uint8Array | null> {
   if (!WASM_NAMES.includes(name)) return null
-  try {
-    const buf = await fs.readFile(join(wasmDir(), name))
-    return new Uint8Array(buf)
-  } catch {
-    return null
-  }
+  const env = ocrEnv()
+  // 打包资源（resources/onnxruntime/）
+  const bundled = await readFirstFile(wasmDirCandidates(env), name)
+  if (bundled) return bundled
+  // 开发态回退：node_modules/onnxruntime-web/dist
+  return readFirstFile([devWasmDir(env.appPath)], name)
 }
 
 export async function getDict(): Promise<string> {

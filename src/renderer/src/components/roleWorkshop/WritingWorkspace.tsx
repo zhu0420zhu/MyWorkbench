@@ -47,9 +47,62 @@ import type {
   WorldInfo
 } from './types'
 
+/** 三栏可选值（同时作为 localStorage 数据的合法性枚举） */
+type LeftTab = 'chars' | 'chapters'
+type CenterTab = 'chat' | 'editor'
+type RightTab = 'settings' | 'novel'
+interface StoredTabs {
+  left: LeftTab
+  center: CenterTab
+  right: RightTab
+}
+
+/** 三栏选择记忆（沿用本文件 `wb-writing-*` 命名习惯） */
+const TABS_STORAGE_KEY = 'wb-writing-tabs'
+const LEFT_TABS: LeftTab[] = ['chars', 'chapters']
+const CENTER_TABS: CenterTab[] = ['chat', 'editor']
+const RIGHT_TABS: RightTab[] = ['settings', 'novel']
+
+/** 读取用户上次的三栏选择；无记录 / 解析失败 / 脏数据一律返回 null（回退 props 默认） */
+function readStoredTabs(): StoredTabs | null {
+  try {
+    const raw = localStorage.getItem(TABS_STORAGE_KEY)
+    if (!raw) return null
+    const v = JSON.parse(raw) as Partial<StoredTabs>
+    if (
+      LEFT_TABS.includes(v.left as LeftTab) &&
+      CENTER_TABS.includes(v.center as CenterTab) &&
+      RIGHT_TABS.includes(v.right as RightTab)
+    ) {
+      return { left: v.left as LeftTab, center: v.center as CenterTab, right: v.right as RightTab }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
 interface WritingWorkspaceProps {
   /** 外部跳转指定章节（暂用于独立窗口，id 形如 "<projectId>/<chapterId>"） */
   openChapterId?: string
+  /**
+   * 首屏默认落在哪一栏。
+   *
+   * 本组件是短篇 + 长篇的唯一入口，靠这三个 prop 决定首屏：
+   *   - 常规进入（Writing）：角色库 / 对话 / 设定（短篇优先）
+   *   - 显式跳转章节（openChapterId）：章节树 / 正文 / 长篇工具（长篇优先）
+   * 三栏均为受控 state，此处仅作为初值，用户切换后照常生效。
+   */
+  defaultLeftTab?: LeftTab
+  defaultCenterTab?: CenterTab
+  defaultRightTab?: RightTab
+  /**
+   * 是否在首屏采用 localStorage 记录的用户栏位偏好（默认 true）。
+   *
+   * 显式跳转（openChapterId）时传 false：跳转意图优先于用户记忆，
+   * 否则会落在错误的栏位（例如要直达章节正文却停在角色库）。
+   */
+  respectStoredTabs?: boolean
 }
 
 /**
@@ -63,7 +116,13 @@ interface WritingWorkspaceProps {
  *   - 短篇能力（角色卡、世界书、草稿自动保存、成书导出、MCP/技能/压缩）原样保留。
  * 中栏「对话 / 正文」双面板常驻挂载（仅切换 display），保证「插入本章」在任意 Tab 下都能写入已加载的编辑器。
  */
-export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProps) {
+export default function WritingWorkspace({
+  openChapterId,
+  defaultLeftTab = 'chars',
+  defaultCenterTab = 'chat',
+  defaultRightTab = 'settings',
+  respectStoredTabs = true
+}: WritingWorkspaceProps) {
   /* ---------------- 长篇状态 ---------------- */
   const [projects, setProjects] = useState<NovelProjectMeta[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -104,10 +163,30 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
   const [worldId, setWorldIdState] = useState<string | null>(null)
   const [presetId, setPresetIdState] = useState<string | null>(null)
 
-  /* ---------------- 布局 Tab ---------------- */
-  const [leftTab, setLeftTab] = useState<'chars' | 'chapters'>('chars')
-  const [centerTab, setCenterTab] = useState<'chat' | 'editor'>('chat')
-  const [rightTab, setRightTab] = useState<'settings' | 'novel'>('settings')
+  /* ---------------- 布局 Tab ----------------
+   * 初值优先级：显式跳转 > 用户记忆 > props 默认。
+   * （respectStoredTabs=false 时不读记忆，保证 openChapterId 跳转落在长篇栏位）
+   */
+  const initialTabs = useMemo<StoredTabs | null>(
+    () => (respectStoredTabs ? readStoredTabs() : null),
+    [respectStoredTabs]
+  )
+  const [leftTab, setLeftTab] = useState<LeftTab>(initialTabs?.left ?? defaultLeftTab)
+  const [centerTab, setCenterTab] = useState<CenterTab>(initialTabs?.center ?? defaultCenterTab)
+  const [rightTab, setRightTab] = useState<RightTab>(initialTabs?.right ?? defaultRightTab)
+
+  /* 用户切换栏位时写回记忆（仅在显式切换时写，避免跳转默认值覆盖用户偏好） */
+  const persistTabs = useCallback(
+    (patch: Partial<StoredTabs>) => {
+      const next: StoredTabs = { left: leftTab, center: centerTab, right: rightTab, ...patch }
+      try {
+        localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+    },
+    [leftTab, centerTab, rightTab]
+  )
 
   /* ---------------- 可拖拽面板宽度 ---------------- */
   const readSize = (key: string, def: number) => {
@@ -118,9 +197,11 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
       return def
     }
   }
-  const [leftWidth, setLeftWidth] = useState(() => readSize('leftWidth', 260))
-  const [rightWidth, setRightWidth] = useState(() => readSize('rightWidth', 340))
+  const [leftWidth, setLeftWidth] = useState(() => readSize('leftWidth', 248))
+  const [rightWidth, setRightWidth] = useState(() => readSize('rightWidth', 300))
   const resizingRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number } | null>(null)
+  // 拖拽过程中用 ref 记录最新宽度：onUp 闭包捕获的是 startResize 时的 state，直接读会存成拖前值
+  const liveWidthRef = useRef({ left: leftWidth, right: rightWidth })
 
   const saveSize = (key: string, value: number) => {
     try {
@@ -132,7 +213,7 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
 
   const startResize = useCallback((side: 'left' | 'right', e: React.MouseEvent) => {
     e.preventDefault()
-    resizingRef.current = { side, startX: e.clientX, startWidth: side === 'left' ? leftWidth : rightWidth }
+    resizingRef.current = { side, startX: e.clientX, startWidth: side === 'left' ? liveWidthRef.current.left : liveWidthRef.current.right }
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
 
@@ -142,16 +223,19 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
       const delta = ev.clientX - r.startX
       if (r.side === 'left') {
         const next = Math.min(420, Math.max(200, r.startWidth + delta))
+        liveWidthRef.current.left = next
         setLeftWidth(next)
       } else {
         const next = Math.min(520, Math.max(220, r.startWidth - delta))
+        liveWidthRef.current.right = next
         setRightWidth(next)
       }
     }
     const onUp = () => {
       const r = resizingRef.current
       if (r) {
-        saveSize(r.side === 'left' ? 'leftWidth' : 'rightWidth', r.side === 'left' ? leftWidth : rightWidth)
+        if (r.side === 'left') saveSize('leftWidth', liveWidthRef.current.left)
+        else saveSize('rightWidth', liveWidthRef.current.right)
       }
       resizingRef.current = null
       document.body.style.cursor = ''
@@ -161,7 +245,7 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [leftWidth, rightWidth])
+  }, [])
 
   useEffect(() => {
     const onResize = () => setNarrow(window.innerWidth < 960)
@@ -169,14 +253,9 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  /* 初始化：写作助手会话 + 短篇设定（世界书/预设/作者注释/正则/快捷） */
+  /* 初始化：短篇设定（世界书/预设/作者注释/正则/快捷）；会话 chatId 由作品切换 effect 按 storeKey 恢复 */
   useEffect(() => {
     void window.api.ai.getConfig().then((cfg) => setModel(cfg.model || ''))
-    void (async () => {
-      const active = (await window.api.sillytavern.chatsActiveGet()) as { charId: string; chatId: string } | null
-      if (active?.chatId) setChatId(active.chatId)
-      else setChatId((await window.api.sillytavern.chatsNewId()) as string)
-    })()
     void (async () => {
       try {
         setWorlds((await window.api.sillytavern.worldsList()) as Array<{ id: string; name: string }>)
@@ -227,9 +306,57 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
   }, [])
 
   useEffect(() => {
-    if (!projectId) return
+    if (!projectId) {
+      setProject(null)
+      return
+    }
     void loadProject(projectId)
   }, [projectId, loadProject])
+
+  /* 长篇助手会话按作品隔离：storeKey=novel_<id>（避免 Windows 路径非法字符），chatId 按作品分槽 */
+  const novelStoreKey = useMemo(() => (projectId ? `novel_${projectId}` : 'default'), [projectId])
+  const chatIdStorageKey = useCallback((pid: string | null) => `wb-writing-chat-${pid ?? 'default'}`, [])
+
+  useEffect(() => {
+    // 切换作品时恢复该作品的助手会话；短篇/default 与各长篇互不串台
+    let cancelled = false
+    void (async () => {
+      try {
+        const saved = localStorage.getItem(chatIdStorageKey(projectId))
+        if (saved) {
+          if (!cancelled) setChatId(saved)
+          return
+        }
+        const active =
+          projectId === null
+            ? ((await window.api.sillytavern.chatsActiveGet()) as { charId: string; chatId: string } | null)
+            : null
+        const id = active?.chatId || ((await window.api.sillytavern.chatsNewId()) as string)
+        if (!cancelled) {
+          setChatId(id)
+          try {
+            localStorage.setItem(chatIdStorageKey(projectId), id)
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, chatIdStorageKey])
+
+  useEffect(() => {
+    if (!chatId || !projectId) return
+    try {
+      localStorage.setItem(chatIdStorageKey(projectId), chatId)
+    } catch {
+      /* ignore */
+    }
+  }, [chatId, projectId, chatIdStorageKey])
 
   /* 角色选择（融合：角色仅作对话上下文，切换不重置会话历史） */
   const handleSelectChar = useCallback(async (id: string) => {
@@ -484,13 +611,13 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div className="writing-shell" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* 顶部：作品切换 + 操作 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border-color, rgba(128,128,128,.15))', flexWrap: 'wrap' }}>
-        <ReadOutlined style={{ opacity: 0.7 }} />
+      <div className="writing-topbar">
+        <ReadOutlined style={{ opacity: 0.65 }} />
         <Select
           size="small"
-          style={{ minWidth: 200 }}
+          style={{ minWidth: 180, maxWidth: 260 }}
           value={projectId ?? undefined}
           onChange={(v) => {
             setProjectId(v)
@@ -498,9 +625,11 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
             setChapter(null)
           }}
           options={projects.map((p) => ({ label: p.title, value: p.id }))}
-          placeholder="选择作品（可选，纯写作无需作品）"
+          placeholder="选择作品（可选）"
           aria-label="选择作品"
           allowClear
+          showSearch
+          optionFilterProp="label"
           onClear={() => {
             setProjectId(null)
             setProject(null)
@@ -508,7 +637,7 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
           }}
         />
         <Tooltip title="新建作品">
-          <Button size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} />
+          <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} />
         </Tooltip>
         {project && (
           <Popconfirm
@@ -528,32 +657,46 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
               message.success('作品已删除')
             }}
           >
-            <Button size="small" danger aria-label="删除作品" icon={<DeleteOutlined />} />
+            <Button size="small" type="text" danger aria-label="删除作品" icon={<DeleteOutlined />} />
           </Popconfirm>
+        )}
+        {project && (
+          <Typography.Text type="secondary" className="writing-topbar-hint" ellipsis>
+            {project.meta.genre || '未填题材'}
+            {project.meta.targetWords ? ` · 目标 ${project.meta.targetWords} 字` : ''}
+            {project.meta.workflowId ? ' · 工作流已挂载' : ''}
+          </Typography.Text>
         )}
         <div style={{ flex: 1 }} />
         <Tooltip title="跑一致性规则：别名归一化、实体重名等">
-          <Button size="small" icon={<AuditOutlined />} disabled={!project || project.chapters.length === 0} onClick={() => setAuditOpen(true)}>
-            一致性审计
+          <Button size="small" type="text" icon={<AuditOutlined />} disabled={!project || project.chapters.length === 0} onClick={() => setAuditOpen(true)}>
+            审计
           </Button>
         </Tooltip>
         <Tooltip title="把这部作品的章节导出成书">
-          <Button size="small" icon={<ExportOutlined />} disabled={!project || project.chapters.length === 0} onClick={() => setBookOpen(true)}>
-            导出成书
+          <Button size="small" type="text" icon={<ExportOutlined />} disabled={!project || project.chapters.length === 0} onClick={() => setBookOpen(true)}>
+            成书
           </Button>
         </Tooltip>
       </div>
 
       {/* 三栏（窄屏纵向堆叠；宽屏可拖拽调整左右栏宽度） */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: narrow ? 'column' : 'row', position: 'relative' }}>
+      <div className="writing-panes" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: narrow ? 'column' : 'row', position: 'relative' }}>
         {/* 左：Tab[角色库 | 章节] */}
-        <div style={{ width: narrow ? '100%' : leftWidth, flexShrink: 0, maxHeight: narrow ? 240 : undefined, borderRight: narrow ? 'none' : '1px solid var(--border-color, rgba(128,128,128,.15))', borderBottom: narrow ? '1px solid var(--border-color, rgba(128,128,128,.15))' : 'none', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div
+          className="writing-pane writing-pane-left"
+          style={{ width: narrow ? '100%' : leftWidth, flexShrink: 0, maxHeight: narrow ? 240 : undefined }}
+        >
           <Tabs
             size="small"
             className="writing-left-tabs"
             style={{ height: '100%', minHeight: 0 }}
             activeKey={leftTab}
-            onChange={(k) => setLeftTab(k as 'chars' | 'chapters')}
+            onChange={(k) => {
+              const v = k as LeftTab
+              setLeftTab(v)
+              persistTabs({ left: v })
+            }}
             items={[
               {
                 key: 'chars',
@@ -622,12 +765,16 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
         )}
 
         {/* 中：Tab[对话 | 正文]（双面板常驻挂载，仅切换 display 以保编辑器句柄） */}
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid var(--border-color, rgba(128,128,128,.15))' }}>
+        <div className="writing-pane writing-pane-center" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="writing-center-bar">
             <Segmented
               size="small"
               value={centerTab}
-              onChange={(v) => setCenterTab(v as 'chat' | 'editor')}
+              onChange={(v) => {
+                const t = v as CenterTab
+                setCenterTab(t)
+                persistTabs({ center: t })
+              }}
               options={[
                 { label: '对话', value: 'chat' },
                 { label: '正文', value: 'editor' }
@@ -635,7 +782,13 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
             />
             <div style={{ flex: 1 }} />
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {centerTab === 'chat' ? 'AI 写作助手（可注入角色 / 长篇上下文）' : '章节正文编辑'}
+              {centerTab === 'chat'
+                ? chapter
+                  ? `对话 · 已加载《${chapter.title || '未命名章节'}》`
+                  : '对话 · AI 助手'
+                : chapter
+                  ? `正文 · ${chapter.title || '未命名章节'}`
+                  : '正文 · 请在左侧选择章节'}
             </Typography.Text>
           </div>
           <div style={{ flex: 1, minHeight: 0, display: centerTab === 'chat' ? 'flex' : 'none', flexDirection: 'column' }}>
@@ -651,7 +804,7 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
               onChatIdChange={setChatId}
               novelContext={project ? { projectId: project.meta.id, chapterId: activeChapterId } : undefined}
               onInsertToChapter={chapter ? insertToChapter : undefined}
-              storeKey="default"
+              storeKey={novelStoreKey}
             />
           </div>
           <div style={{ flex: 1, minHeight: 0, display: centerTab === 'editor' ? 'flex' : 'none', flexDirection: 'column' }}>
@@ -695,13 +848,20 @@ export default function WritingWorkspace({ openChapterId }: WritingWorkspaceProp
         )}
 
         {/* 右：Tab[设定 | 长篇工具] */}
-        <div style={{ width: narrow ? '100%' : rightWidth, flexShrink: 0, maxHeight: narrow ? 300 : undefined, borderLeft: narrow ? 'none' : '1px solid var(--border-color, rgba(128,128,128,.15))', borderTop: narrow ? '1px solid var(--border-color, rgba(128,128,128,.15))' : 'none', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div
+          className="writing-pane writing-pane-right"
+          style={{ width: narrow ? '100%' : rightWidth, flexShrink: 0, maxHeight: narrow ? 300 : undefined, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        >
           <Tabs
             size="small"
             className="writing-right-tabs"
             style={{ height: '100%', minHeight: 0 }}
             activeKey={rightTab}
-            onChange={(k) => setRightTab(k as 'settings' | 'novel')}
+            onChange={(k) => {
+              const v = k as RightTab
+              setRightTab(v)
+              persistTabs({ right: v })
+            }}
             items={[
               {
                 key: 'settings',

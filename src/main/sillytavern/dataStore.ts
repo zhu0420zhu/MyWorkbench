@@ -59,9 +59,10 @@ export function settingsFile(): string {
   return join(userDir(), 'settings.json')
 }
 
-/** 聊天记录目录：chats/<charId>/ */
+/** 聊天记录目录：chats/<charId>/（非法路径字符替换，避免 Windows 下 novel:xxx 失败） */
 export function charChatsDir(charId: string): string {
-  return join(chatsDir(), charId)
+  const safe = String(charId).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || 'default'
+  return join(chatsDir(), safe)
 }
 
 /** 聊天记录文件：chats/<charId>/<chatId>.json */

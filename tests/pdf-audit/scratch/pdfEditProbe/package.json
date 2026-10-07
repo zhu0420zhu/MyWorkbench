@@ -1,0 +1,7 @@
+{
+  "name": "pdf-edit-content-probe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "description": "探针：在真实 Chromium 里调用项目真实实现 pdfBytesToHtml，验证 PDF 文本层提取。"
+}

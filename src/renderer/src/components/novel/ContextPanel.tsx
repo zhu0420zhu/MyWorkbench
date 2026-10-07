@@ -72,6 +72,12 @@ export default function ContextPanel({
   })
   const [noteInput, setNoteInput] = useState('')
   const [reindexing, setReindexing] = useState(false)
+  /**
+   * 已**持久化**的钉选备忘（落盘于 context-notes.json 的字符串数组）。
+   * 与编排块里的「钉住的备忘」块是同一份数据的两种视图：
+   * 块是给模型看的拼接文本（多条合并成一块），这里是可逐条增删的管理视图。
+   */
+  const [pinnedNotes, setPinnedNotes] = useState<string[]>([])
 
   const aliveRef = useRef(true)
   useEffect(() => {
@@ -80,6 +86,20 @@ export default function ContextPanel({
       aliveRef.current = false
     }
   }, [])
+
+  /** 从主进程读回已持久化的钉选备忘（切换项目时也要重新读，否则会带着上一个项目的列表） */
+  const loadPinned = useCallback(async () => {
+    try {
+      const list = await window.api.novel.listPinnedNotes(projectId)
+      if (aliveRef.current) setPinnedNotes(list)
+    } catch {
+      if (aliveRef.current) message.error('加载已钉住的备忘失败')
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void loadPinned()
+  }, [loadPinned])
 
   const build = useCallback(async () => {
     if (!chapterId) return
@@ -176,10 +196,35 @@ export default function ContextPanel({
   const addNote = useCallback(async () => {
     const t = noteInput.trim()
     if (!t) return
-    await window.api.novel.addPinnedNote(projectId, t)
-    setNoteInput('')
-    await build()
+    try {
+      const notes = await window.api.novel.addPinnedNote(projectId, t)
+      if (aliveRef.current) setPinnedNotes(notes)
+      setNoteInput('')
+      await build()
+    } catch {
+      if (aliveRef.current) message.error('添加备忘失败')
+    }
   }, [projectId, noteInput, build])
+
+  /**
+   * 删除一条已钉住的备忘。
+   * 主进程 removePinnedNote(projectId, index) 按**持久化数组下标**删除（见 contextBuilder.ts:77），
+   * 而列表顺序就是持久化顺序，所以直接用行下标即可对齐；返回的新数组直接用，避免本地索引错位。
+   */
+  const removePinned = useCallback(
+    async (index: number) => {
+      try {
+        const next = await window.api.novel.removePinnedNote(projectId, index)
+        if (!aliveRef.current) return
+        setPinnedNotes(next)
+        message.success('已删除备忘')
+        await build()
+      } catch {
+        if (aliveRef.current) message.error('删除备忘失败')
+      }
+    },
+    [projectId, build]
+  )
 
   const reindex = useCallback(async () => {
     setReindexing(true)
@@ -403,14 +448,22 @@ export default function ContextPanel({
                     onClick={() => move(i, 1)}
                   />
                   {b.removable && (
-                    <Button
-                      size="small"
-                      type="text"
-                      danger
-                      aria-label="删除上下文块"
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeBlock(b.id)}
-                    />
+                    <Tooltip
+                      title={
+                        b.kind === 'note'
+                          ? '仅从本次编排中移除；要永久删除请用下方「已钉住的备忘」里的删除按钮'
+                          : '从本次编排中移除该块（不改动已保存的内容）'
+                      }
+                    >
+                      <Button
+                        size="small"
+                        type="text"
+                        danger
+                        aria-label="删除上下文块"
+                        icon={<DeleteOutlined />}
+                        onClick={() => removeBlock(b.id)}
+                      />
+                    </Tooltip>
                   )}
                 </div>
                 {b.text ? (
@@ -434,6 +487,33 @@ export default function ContextPanel({
       </div>
 
       <div style={{ padding: '6px 8px', borderTop: '1px solid var(--border-color, rgba(128,128,128,.15))' }}>
+        {pinnedNotes.length > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 10 }}>
+              已钉住的备忘（{pinnedNotes.length}）· 删除会立即落盘
+            </Typography.Text>
+            <div style={{ maxHeight: 132, overflowY: 'auto', marginTop: 2 }}>
+              {pinnedNotes.map((n, i) => (
+                <div key={`${i}-${n}`} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Typography.Text
+                    ellipsis={{ tooltip: n }}
+                    style={{ fontSize: 11, flex: 1, minWidth: 0 }}
+                  >
+                    {n}
+                  </Typography.Text>
+                  <Button
+                    size="small"
+                    type="text"
+                    danger
+                    aria-label={`删除备忘：${n}`}
+                    icon={<DeleteOutlined />}
+                    onClick={() => void removePinned(i)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <Space size={4} style={{ width: '100%' }}>
           <Input
             size="small"

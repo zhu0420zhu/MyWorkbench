@@ -9,7 +9,31 @@ import type {
   AutomationDoneEvent,
   SearchResult,
   AiConfig,
+  AiProfile,
+  AiProfilesState,
+  AiRouting,
+  AgentHubSnapshot,
+  AgentMemory,
+  AgentRoleBrief,
+  AutopilotBrief,
+  CodeSymbol,
+  DutySlot,
+  EvoApp,
+  ExperienceCard,
+  GoalBrief,
+  ImChannel,
   AiChatMessage,
+  DashboardOverview,
+  IssueBrief,
+  IssueComment,
+  PlanBrief,
+  ResourceCatalog,
+  RunBrief,
+  SandboxRun,
+  SquadBrief,
+  UsageStatsState,
+  WorkspaceBrief,
+  WorkspaceDir,
   AiTool,
   AiChunkEvent,
   AiDoneEvent,
@@ -104,10 +128,19 @@ import type {
   SkillImportResult,
   SkillRunResult,
   WritingSkill,
+  NovelWorkflow,
+  ProjectWorkflowState,
+  DocOpenResult,
+  SurgicalExtractResult,
+  SurgicalApplyResult,
+  SurgicalEdit,
   DataAssetRecord,
   DataAssetColumn,
   ReferenceRecord,
-  ReferenceScope
+  ReferenceScope,
+  KbCandidate,
+  KbInjectBlock,
+  KbRefPick
 } from '../shared/types'
 
 /* ---- 工具集类型（由 ck 08_工具集 移植） ---- */
@@ -335,6 +368,7 @@ export interface Api {
       genre?: string
       synopsis?: string
       targetWords?: number
+      workflowId?: string
     }) => Promise<NovelProject>
     getProject: (projectId: string) => Promise<NovelProject | null>
     updateProject: (
@@ -342,6 +376,12 @@ export interface Api {
       patch: { title?: string; genre?: string; synopsis?: string; targetWords?: number }
     ) => Promise<NovelProjectMeta | null>
     removeProject: (projectId: string) => Promise<boolean>
+
+    listWorkflows: () => Promise<NovelWorkflow[]>
+    getWorkflow: (projectId: string) => Promise<ProjectWorkflowState | null>
+    workflowStepDone: (projectId: string, stepId: string, done: boolean) => Promise<ProjectWorkflowState | null>
+    switchWorkflow: (projectId: string, workflowId: string) => Promise<ProjectWorkflowState | null>
+    seedWorkflowSkills: () => Promise<number>
 
     createVolume: (projectId: string, title: string, summary?: string) => Promise<Volume[]>
     updateVolume: (
@@ -633,10 +673,10 @@ export interface Api {
     saveDraft: (title: string, content: string) => Promise<string | null>
   }
   prefs: {
-    get: () => Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }>
-    set: (
-      prefs: { colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }
-    ) => Promise<{ colorPrimary: string; defaultPage: string; surfaceBg: string; surfaceOpacity: number }>
+    get: () => Promise<Record<string, unknown>>
+    set: (prefs: Record<string, unknown>) => Promise<Record<string, unknown>>
+    pickWallpaper: () => Promise<{ ok: boolean; path?: string; error?: string }>
+    wallpaperUrl: (path: string) => Promise<string>
   }
   translate: {
     run: (text: string, source: string, target: string) => Promise<{ ok: boolean; value?: string; error?: string }>
@@ -657,6 +697,21 @@ export interface Api {
     notifyStatus: () => Promise<HotNotifierStatus>
   }
   pickTextFile: () => Promise<{ name: string; content: string } | null>
+  docs: {
+    pick: () => Promise<DocOpenResult>
+    openPath: (path: string) => Promise<DocOpenResult>
+    save: (path: string, content: string) => Promise<{ ok: boolean; error?: string }>
+    saveAs: (content: string, defaultName?: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+    saveAsFormat: (
+      payload: { source: 'text' | 'html'; content: string; defaultName?: string; format?: string }
+    ) => Promise<{ ok: boolean; path?: string; error?: string }>
+    saveHtmlAs: (html: string, defaultName?: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+    saveDocxAs: (html: string, defaultName?: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+    saveOffice: (path: string, html: string) => Promise<{ ok: boolean; error?: string; note?: string }>
+    print: () => Promise<{ ok: boolean; error?: string }>
+    surgicalExtract: (path: string) => Promise<SurgicalExtractResult>
+    surgicalApply: (path: string, edits: SurgicalEdit[]) => Promise<SurgicalApplyResult>
+  }
   searchAll: (query: string) => Promise<SearchResult[]>
   aiMemory: {
     load: () => Promise<{ enabled: boolean; messages: AiChatMessage[] }>
@@ -675,6 +730,34 @@ export interface Api {
     getConfig: () => Promise<AiConfig>
     saveConfig: (cfg: AiConfig) => Promise<AiConfig>
     testConnection: () => Promise<{ ok: boolean; error?: string; latencyMs?: number }>
+    listProfiles: () => Promise<AiProfilesState>
+    addProfile: (input: {
+      name: string
+      endpoint?: string
+      apiKey?: string
+      model?: string
+      systemPrompt?: string
+      secondaryModel?: string
+      activate?: boolean
+    }) => Promise<AiProfilesState>
+    updateProfile: (
+      id: string,
+      patch: Partial<{
+        name: string
+        endpoint: string
+        apiKey: string
+        model: string
+        systemPrompt: string
+        secondaryModel: string
+      }>
+    ) => Promise<AiProfilesState>
+    removeProfile: (id: string) => Promise<AiProfilesState>
+    setActiveProfile: (id: string) => Promise<AiProfilesState>
+    testProfile: (cfg: AiConfig) => Promise<{ ok: boolean; error?: string; latencyMs?: number }>
+    listModels: (endpoint: string, apiKey?: string) => Promise<{ ok: boolean; models: string[]; error?: string }>
+    addOllama: (opts?: { endpoint?: string; model?: string; name?: string }) => Promise<AiProfilesState>
+    getRouting: () => Promise<AiRouting>
+    setRouting: (r: Partial<AiRouting>) => Promise<AiRouting>
     chat: (sessionId: string, messages: AiChatMessage[], model?: string, tools?: AiTool[], sampling?: Record<string, number | string | boolean>) => Promise<boolean>
     complete: (messages: AiChatMessage[], model?: string) => Promise<{ ok: boolean; text: string; error?: string }>
     stop: (sessionId: string) => Promise<boolean>
@@ -758,6 +841,119 @@ export interface Api {
     tempStatus: () => Promise<ConvertTempStatus>
     cleanupTemp: (expireHours?: number) => Promise<ConvertCleanupResult>
   }
+  media: {
+    ffmpegAvailable: () => Promise<boolean>
+    pickImages: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickImage: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickVideos: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickVideo: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickAudios: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickAudio: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickMedia: () => Promise<Array<{ path: string; name: string; size: number }>>
+    savePath: (defaultName: string, exts: string[]) => Promise<string | null>
+    readFile: (filePath: string) => Promise<Uint8Array | null>
+    writeFile: (filePath: string, data: Uint8Array) => Promise<boolean>
+    probe: (filePath: string) => Promise<{
+      ok: boolean
+      error?: string
+      durationSec: number
+      width: number
+      height: number
+      fps: number
+      hasAudio: boolean
+      hasVideo: boolean
+      sizeBytes: number
+      formatName: string
+      videoCodec: string
+      audioCodec: string
+    }>
+    convert: (input: {
+      sourcePath: string
+      targetFormat: string
+      outputPath?: string
+      quality?: 'low' | 'medium' | 'high'
+      kind?: 'video' | 'audio' | 'gif'
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number; durationMs?: number }>
+    extractFrame: (input: {
+      sourcePath: string
+      timeSec: number
+      outputPath?: string
+      format?: 'png' | 'jpg' | 'webp'
+      width?: number
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+    videoToGif: (input: {
+      sourcePath: string
+      startSec: number
+      endSec: number
+      outputPath?: string
+      fps?: number
+      width?: number
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+    extractAudio: (input: {
+      sourcePath: string
+      outputPath?: string
+      targetFormat?: string
+      quality?: 'low' | 'medium' | 'high'
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+    trim: (input: {
+      sourcePath: string
+      startSec: number
+      endSec: number
+      outputPath?: string
+      reencode?: boolean
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+    imageConvert: (input: {
+      sourcePath: string
+      targetFormat: string
+      outputPath?: string
+      quality?: 'low' | 'medium' | 'high'
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+  }
+  hardware: {
+    clipboardList: () => Promise<
+      Array<{
+        id: string
+        kind: 'text' | 'image' | 'files'
+        text?: string
+        preview?: string
+        filePaths?: string[]
+        imageDataUrl?: string
+        size: number
+        createdAt: number
+      }>
+    >
+    clipboardClear: () => Promise<boolean>
+    clipboardRemove: (id: string) => Promise<boolean>
+    clipboardCopy: (id: string) => Promise<boolean>
+    onClipboardEvent: (cb: (entry: unknown) => void) => () => void
+    system: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    cpuMemory: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    graphics: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    board: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    disk: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    network: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    power: (force?: boolean) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>
+    summary: () => Promise<Record<string, { ok: boolean; error?: string; data?: Record<string, unknown>; fetchedAt: number }>>
+  }
+  ppt: {
+    available: () => Promise<boolean>
+    toPdf: (sourcePath: string) => Promise<{ ok: boolean; bytes?: Uint8Array; error?: string }>
+  }
+  pdf: {
+    sofficeAvailable: () => Promise<boolean>
+    pickPdfs: () => Promise<Array<{ path: string; name: string; size: number }>>
+    pickExcel: () => Promise<Array<{ path: string; name: string; size: number }>>
+    read: (filePath: string) => Promise<Uint8Array | null>
+    write: (filePath: string, data: Uint8Array) => Promise<boolean>
+    savePath: (defaultName: string, exts: string[]) => Promise<string | null>
+    pickDir: (title?: string) => Promise<string | null>
+    exists: (paths: string[]) => Promise<boolean[]>
+    excelToPdf: (input: {
+      sourcePath: string
+      outputPath?: string
+      pageOrientation?: 'auto' | 'portrait' | 'landscape'
+    }) => Promise<{ ok: boolean; error?: string; outputPath?: string; sizeBytes?: number }>
+  }
   searchIndex: {
     ingest: (filePath: string) => Promise<IngestResult>
     ingestDir: (dir: string, recursive?: boolean, extFilter?: string[]) => Promise<IngestResult[]>
@@ -779,6 +975,9 @@ export interface Api {
     assetColumns: (assetId: string) => Promise<DataAssetColumn[]>
     addReference: (rec: ReferenceRecord) => Promise<void>
     listReferences: (scope?: ReferenceScope, refPos?: string) => Promise<ReferenceRecord[]>
+    listCandidates: (q?: string) => Promise<KbCandidate[]>
+    resolveInject: (picks: KbRefPick[], query?: string) => Promise<KbInjectBlock[]>
+    renderInject: (blocks: KbInjectBlock[]) => Promise<string>
   }
   kbData: {
     aggregate: (req: AggregateRequest) => Promise<AggregateResult>
@@ -846,6 +1045,61 @@ export interface Api {
     // 编译角色上下文为 system 文本（写作融合模式注入 ai.chat）
     buildContext: (opts: { card: unknown; world: unknown; conversationText: string; authorNote: unknown }) => Promise<string>
     stop: (sessionId: string) => Promise<boolean>
+  }
+  usage: {
+    pageVisit: (page: string) => Promise<void>
+    dashboard: () => Promise<DashboardOverview>
+    reset: () => Promise<UsageStatsState>
+  }
+  hub: {
+    snapshot: () => Promise<AgentHubSnapshot>
+    runtimes: () => Promise<Array<{ id: string; label: string; available: boolean; path?: string }>>
+    renameWorkspace: (name: string) => Promise<WorkspaceBrief>
+    listAgents: () => Promise<AgentRoleBrief[]>
+    upsertAgent: (input: Partial<AgentRoleBrief> & { name: string }) => Promise<AgentRoleBrief>
+    removeAgent: (id: string) => Promise<void>
+    bindSkills: (agentId: string, skillIds: string[]) => Promise<AgentRoleBrief | null>
+    listSquads: () => Promise<SquadBrief[]>
+    upsertSquad: (input: Partial<SquadBrief> & { name: string }) => Promise<SquadBrief>
+    listIssues: () => Promise<IssueBrief[]>
+    createIssue: (input: {
+      title: string
+      body?: string
+      assigneeId?: string
+      squadId?: string
+      repoPath?: string
+      labels?: string[]
+    }) => Promise<IssueBrief>
+    updateIssue: (id: string, patch: Partial<IssueBrief>) => Promise<IssueBrief | null>
+    commentIssue: (issueId: string, author: string, kind: 'human' | 'agent', body: string) => Promise<IssueComment | null>
+    removeIssue: (id: string) => Promise<void>
+    runIssue: (id: string, force?: boolean) => Promise<{ ok: boolean; runId?: string; error?: string }>
+    reviewIssue: (id: string, approve: boolean, note?: string) => Promise<void>
+    listRuns: (issueId?: string) => Promise<RunBrief[]>
+    inboxRead: (id: string, read?: boolean) => Promise<void>
+    inboxClear: () => Promise<void>
+    listAutopilots: () => Promise<AutopilotBrief[]>
+    upsertAutopilot: (input: Partial<AutopilotBrief> & { name: string }) => Promise<AutopilotBrief>
+    removeAutopilot: (id: string) => Promise<void>
+    generatePlan: (opts: { title: string; detail?: string; issueId?: string; goalId?: string }) => Promise<{ ok: boolean; planId?: string; error?: string }>
+    executePlan: (planId: string) => Promise<{ ok: boolean; error?: string }>
+    upsertPlan: (input: Partial<PlanBrief> & { title: string }) => Promise<PlanBrief>
+    upsertGoal: (input: Partial<GoalBrief> & { title: string }) => Promise<GoalBrief>
+    advanceGoal: (goalId: string) => Promise<{ ok: boolean; error?: string }>
+    setDuty: (slots: DutySlot[]) => Promise<DutySlot[]>
+    upsertApp: (input: Partial<EvoApp> & { name: string }) => Promise<EvoApp>
+    runApp: (appId: string) => Promise<{ ok: boolean; error?: string; output?: string }>
+    upsertWorkspaceDir: (input: { name: string; path: string }) => Promise<WorkspaceDir>
+    addExperience: (input: Omit<ExperienceCard, 'id' | 'createdAt'>) => Promise<ExperienceCard>
+    addMemory: (input: Omit<AgentMemory, 'id' | 'createdAt'>) => Promise<AgentMemory>
+    upsertImChannel: (input: Partial<ImChannel> & { name: string; webhookUrl: string }) => Promise<ImChannel>
+    sendIm: (channelId: string, title: string, body: string) => Promise<{ ok: boolean; error?: string }>
+    testIm: (channel: ImChannel) => Promise<{ ok: boolean; error?: string }>
+    marketCatalog: (remoteUrl?: string) => Promise<ResourceCatalog>
+    marketInstall: (id: string) => Promise<{ ok: boolean; error?: string; count?: number }>
+    codeIndexBuild: (rootDir: string) => Promise<CodeSymbol[]>
+    codeIndexQuery: (q: string) => Promise<CodeSymbol[]>
+    sandboxRun: (cwd: string, command: string, timeoutMs?: number) => Promise<SandboxRun>
   }
 }
 

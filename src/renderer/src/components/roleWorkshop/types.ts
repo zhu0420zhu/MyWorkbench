@@ -16,6 +16,8 @@ export interface CharCard {
   creator: string
   character_version: string
   extensions: Record<string, unknown>
+  /** 未知顶层字段留存位（主进程读取时收集、序列化时展平回顶层；此处置只需类型可见性） */
+  __extra?: Record<string, unknown>
 }
 
 export interface CharacterMeta {

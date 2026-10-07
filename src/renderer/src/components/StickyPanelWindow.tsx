@@ -145,12 +145,12 @@ export default function StickyPanelWindow() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: token.colorBgLayout
+        background: 'var(--wb-surface-bg, ' + token.colorBgLayout + ')'
       }}
     >
-      {/* 拖拽条：无边框窗口拖动区域 */}
+      {/* 拖拽条：无边框窗口拖动区域 · 玻璃标题 */}
       <div
-        className="sticky-panel-drag"
+        className="sticky-panel-drag titlebar-glass"
         style={{
           height: 34,
           flexShrink: 0,
@@ -159,7 +159,6 @@ export default function StickyPanelWindow() {
           justifyContent: 'space-between',
           padding: '0 6px 0 14px',
           borderBottom: `1px solid ${token.colorSplit}`,
-          background: token.colorBgContainer,
           userSelect: 'none'
         }}
       >

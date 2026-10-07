@@ -1,0 +1,7 @@
+{
+  "name": "pdf-audit-probe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "description": "探针：在真实 Chromium 中验证 PDF 转图像与文本提取链路（pdf.js + Canvas）。"
+}

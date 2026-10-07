@@ -37,7 +37,11 @@ async function initWasm(): Promise<void> {
   if (bin && bin.byteLength > 0) {
     ort.env.wasm.wasmBinary = bin
   } else {
-    ort.env.wasm.wasmPaths = './'
+    // 不再回退到 wasmPaths='./'：打包态该路径解析到 resources/app.asar/out/renderer/，
+    // 那里没有任何 .wasm，只会让 ort 静静 404 抓空文件。改为明确失败，把诊断抛给上层。
+    throw new Error(
+      'OCR 运行时缺失：未能从主进程读到 ort wasm 二进制（resources/onnxruntime/ort-wasm-simd-threaded.jsep.wasm）。请确认安装包资源完整。'
+    )
   }
   wasmReady = true
 }

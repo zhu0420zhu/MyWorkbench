@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CloseOutlined, ExportOutlined, MinusOutlined } from '@ant-design/icons'
 import { Tooltip, theme as antdTheme } from 'antd'
 import type { PageKey } from '../nav'
+import { useTheme } from '../theme/theme'
+import { useZoneChrome, zoneWallpaperBackground } from './WallpaperLayer'
 
 interface TitleBarProps {
   /** 标题文字：主窗口为产品名，独立窗口为页面名 */
@@ -15,16 +17,49 @@ interface TitleBarProps {
 export default function TitleBar({ title = '灵墨工作台', page, pageId }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false)
   const { token } = antdTheme.useToken()
+  const { isDark } = useTheme()
+  const zone = useZoneChrome('titlebar')
+  const [imgUrl, setImgUrl] = useState('')
 
   useEffect(() => {
     const off = window.api.windowApi.onMaximizedChange((m) => setMaximized(m))
     return off
   }, [])
 
+  useEffect(() => {
+    let alive = true
+    const path = zone.imagePath
+    if (!zone.enabled || zone.mode !== 'image' || !path) {
+      setImgUrl('')
+      return
+    }
+    void window.api.prefs
+      .wallpaperUrl(path)
+      .then((u) => {
+        if (alive) setImgUrl(u)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [zone.enabled, zone.mode, zone.imagePath])
+
+  const zoneBg = useMemo(() => {
+    if (!zone.enabled) return undefined
+    return zoneWallpaperBackground(zone.mode, isDark, zone.c1, zone.c2, zone.mode === 'image' ? imgUrl : undefined)
+  }, [zone, isDark, imgUrl])
+
   return (
     <div
-      className="titlebar"
-      style={{ background: token.colorBgContainer, borderBottom: `1px solid ${token.colorBorderSecondary}` }}
+      className="titlebar titlebar-glass"
+      data-wp-zone={zone.enabled ? zone.mode : 'off'}
+      style={{
+        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        background: zone.enabled && zoneBg && zoneBg !== 'transparent' ? zoneBg : undefined,
+        opacity: zone.enabled ? Math.max(0.55, zone.opacity) : undefined,
+        backgroundSize: zone.mode === 'image' ? 'cover' : undefined,
+        backgroundPosition: 'center'
+      }}
     >
       <div className="titlebar-drag">
         <span className="titlebar-title" style={{ color: token.colorTextSecondary }}>

@@ -57,16 +57,48 @@ export function extractCharaFromPng(bytes: Uint8Array): string | null {
   return null
 }
 
-/** 将角色卡 JSON 嵌入 PNG 的 tEXt chunk（保留原图字节） */
+/**
+ * 将角色卡 JSON 嵌入 PNG 的 tEXt chunk（保留原图字节）
+ * 去重：插入前剔除所有既有的 keyword==='chara' tEXt chunk，避免反复保存导致
+ * 卡片被复制 N 份、文件按卡片大小反复膨胀。其余 chunk 一律原样字节拷贝（不重算 CRC）。
+ */
 export function embedCharaInPng(bytes: Uint8Array, charaJson: string): Uint8Array {
+  const src = Buffer.from(bytes)
+  if (src.length < 8) throw new Error('embedCharaInPng: not a PNG (too short)')
+  for (let i = 0; i < 8; i++) if (src[i] !== PNG_SIG[i]) throw new Error('embedCharaInPng: invalid PNG signature')
+
   const textData = Buffer.concat([
     Buffer.from('chara\0', 'latin1'),
     Buffer.from(charaJson, 'utf-8')
   ])
-  const tex = chunk('tEXt', new Uint8Array(textData))
-  const head = Buffer.from(bytes.slice(0, 8))
-  const rest = Buffer.from(bytes.slice(8))
-  return new Uint8Array(Buffer.concat([head, Buffer.from(tex), rest]))
+  const tex = Buffer.from(chunk('tEXt', new Uint8Array(textData)))
+
+  // 签名 + 新 chara chunk（插在签名之后最前面，保证 extract 读到最新卡片）+ 其余 chunk
+  const parts: Buffer[] = [src.slice(0, 8), tex]
+  let offset = 8
+  while (offset + 8 <= src.length) {
+    const len = src.readUInt32BE(offset)
+    const dataEnd = offset + 8 + len
+    const crcEnd = dataEnd + 4
+    if (crcEnd > src.length) {
+      // 尾部不完整：原样保留剩余字节，避免丢数据
+      parts.push(src.slice(offset))
+      break
+    }
+    const type = src.toString('ascii', offset + 4, offset + 8)
+    if (type === 'tEXt') {
+      const dataStart = offset + 8
+      let nul = dataStart
+      while (nul < dataEnd && src[nul] !== 0) nul++
+      if (nul < dataEnd && src.toString('latin1', dataStart, nul) === 'chara') {
+        offset = crcEnd // 跳过旧 chara chunk
+        continue
+      }
+    }
+    parts.push(src.slice(offset, crcEnd))
+    offset = crcEnd
+  }
+  return new Uint8Array(Buffer.concat(parts))
 }
 
 export function isPng(bytes: Uint8Array): boolean {

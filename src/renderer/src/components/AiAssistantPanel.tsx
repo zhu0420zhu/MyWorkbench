@@ -3,6 +3,7 @@ import { Button, Alert, Card, Collapse, Empty, Input, List, Select, Space, Switc
 import { RobotOutlined, SettingOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons'
 import ComposerInput, { BUILTIN_SKILLS } from './ComposerInput'
 import type { AiChatMessage, AskResult } from '@shared/types'
+import { formatError } from '../utils/formatError'
 
 interface ChatItem {
   role: 'user' | 'assistant'
@@ -99,11 +100,23 @@ export default function AiAssistantPanel() {
 
   // 记忆开启时自动保存对话（防抖）
   const memoryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // 自动保存失败只提示一次，避免输入时反复弹窗；下次保存成功复位
+  const autoSaveErrNotifiedRef = useRef(false)
   useEffect(() => {
     if (!memoryLoaded.current || !memoryEnabled) return
     clearTimeout(memoryTimer.current)
     memoryTimer.current = setTimeout(() => {
-      window.api.aiMemory.save({ enabled: true, messages: messages as AiChatMessage[] }).catch(() => undefined)
+      window.api.aiMemory
+        .save({ enabled: true, messages: messages as AiChatMessage[] })
+        .then(() => {
+          autoSaveErrNotifiedRef.current = false
+        })
+        .catch((err) => {
+          if (!autoSaveErrNotifiedRef.current) {
+            autoSaveErrNotifiedRef.current = true
+            message.error('记忆自动保存失败：' + formatError(err, '未知错误'))
+          }
+        })
     }, 600)
   }, [messages, memoryEnabled])
 
@@ -208,7 +221,9 @@ export default function AiAssistantPanel() {
                     onClick={() => {
                       setMessages([])
                       if (memoryEnabled) {
-                        window.api.aiMemory.clear().catch(() => undefined)
+                        window.api.aiMemory
+                          .clear()
+                          .catch((err) => message.error('记忆清除失败：' + formatError(err, '未知错误')))
                       }
                       message.success('已开启新对话')
                     }}
@@ -217,15 +232,15 @@ export default function AiAssistantPanel() {
                   </Button>
                   <Switch
                     checked={memoryEnabled}
-                    onChange={(v) => {
-                      setMemoryEnabled(v)
-                      if (v) {
-                        window.api.aiMemory.save({ enabled: true, messages: messages as AiChatMessage[] }).catch(() => undefined)
-                        message.success('已开启记忆：对话将自动记录')
-                      } else {
+                    onChange={async (v) => {
+                      try {
                         // 关闭状态也必须持久化 enabled:false，否则下次加载读到的仍是上次的 enabled:true，开关"关不住"
-                        window.api.aiMemory.save({ enabled: false, messages: messages as AiChatMessage[] }).catch(() => undefined)
-                        message.success('已关闭记忆')
+                        await window.api.aiMemory.save({ enabled: v, messages: messages as AiChatMessage[] })
+                        setMemoryEnabled(v)
+                        message.success(v ? '已开启记忆：对话将自动记录' : '已关闭记忆')
+                      } catch (err) {
+                        // 保存失败不切换开关：避免"看着开着其实没存上"，与磁盘状态保持一致
+                        message.error('记忆设置保存失败：' + formatError(err, '未知错误'))
                       }
                     }}
                     checkedChildren="记忆开"

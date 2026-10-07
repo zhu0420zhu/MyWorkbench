@@ -317,4 +317,34 @@ export class Indexer {
       available: true
     }
   }
+
+  /** 列出已索引文档（供 # 引用选择器）；q 非空时按文件名过滤 */
+  listDocs(limit = 200, q?: string): IndexDoc[] {
+    let docs = [...this.docs.values()]
+    if (q && q.trim()) {
+      const k = q.trim().toLowerCase()
+      docs = docs.filter((d) => d.fileName.toLowerCase().includes(k) || d.filePath.toLowerCase().includes(k))
+    }
+    docs.sort((a, b) => b.indexedAt - a.indexedAt)
+    return docs.slice(0, limit)
+  }
+
+  /** 取某文档元数据 */
+  getDoc(docId: string): IndexDoc | null {
+    return this.docs.get(docId) ?? null
+  }
+
+  /** 取某文档全部块文本拼接（全文注入通道） */
+  getDocText(docIdOrPath: string): string | null {
+    const doc = this.docs.get(docIdOrPath)
+    const id = doc?.docId ?? docIdOf(docIdOrPath)
+    const chunkIds = this.docChunks.get(id)
+    if (!chunkIds?.length) return null
+    const parts = chunkIds
+      .map((cid) => this.chunks.get(cid))
+      .filter((c): c is IndexChunk => !!c)
+      .sort((a, b) => a.startChar - b.startChar)
+      .map((c) => c.text)
+    return parts.length ? parts.join('\n\n') : null
+  }
 }

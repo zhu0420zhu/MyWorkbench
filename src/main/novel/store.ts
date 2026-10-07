@@ -131,6 +131,8 @@ export interface CreateProjectInput {
   genre?: string
   synopsis?: string
   targetWords?: number
+  /** 指定写作工作流；省略时按题材智能推荐（默认网文快写流） */
+  workflowId?: string
 }
 
 export async function listProjects(): Promise<NovelProjectMeta[]> {
@@ -150,7 +152,9 @@ export async function createProject(input: CreateProjectInput): Promise<NovelPro
     wordCount: 0,
     chapterCount: 0,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    workflowId: input.workflowId,
+    workflowDone: []
   }
 
   const idx = await readProjectIndex()
@@ -185,7 +189,9 @@ export async function getProject(projectId: string): Promise<NovelProject | null
 
 export async function updateProject(
   projectId: string,
-  patch: Partial<Pick<NovelProjectMeta, 'title' | 'genre' | 'synopsis' | 'targetWords'>>
+  patch: Partial<
+    Pick<NovelProjectMeta, 'title' | 'genre' | 'synopsis' | 'targetWords' | 'workflowId' | 'workflowDone'>
+  >
 ): Promise<NovelProjectMeta | null> {
   const idx = await readProjectIndex()
   const target = idx.projects.find((p) => p.id === projectId)
@@ -194,6 +200,8 @@ export async function updateProject(
   if (patch.genre !== undefined) target.genre = patch.genre
   if (patch.synopsis !== undefined) target.synopsis = patch.synopsis
   if (patch.targetWords !== undefined) target.targetWords = patch.targetWords
+  if (patch.workflowId !== undefined) target.workflowId = patch.workflowId
+  if (patch.workflowDone !== undefined) target.workflowDone = patch.workflowDone
   target.updatedAt = Date.now()
   await writeProjectIndex(idx)
   return target

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
+  Dropdown,
   Empty,
   Input,
-  Popconfirm,
+  Modal,
   Select,
   Space,
   Spin,
@@ -22,13 +23,15 @@ import {
   HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
-  UndoOutlined
+  UndoOutlined,
+  NumberOutlined
 } from '@ant-design/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import type { AiChatMessage, McpToolInfo } from '@shared/types'
+import type { AiChatMessage, KbRefPick, McpToolInfo, WritingSkill } from '@shared/types'
 import type { ChatMsg, CharacterMeta, WorldInfo, SamplingParams, AuthorNote, RegexScript, QuickReply } from './types'
 import ComposerInput from '../ComposerInput'
+import KbTriggerPicker from '../kb/KbTriggerPicker'
 import { buildTools, buildSystemWithSkills } from './assistantCore'
 import SnapshotDrawer from '../SnapshotDrawer'
 import BookExportDialog from '../BookExportDialog'
@@ -119,6 +122,8 @@ export default function WorkshopChat(props: Props) {
   const [primary, setPrimary] = useState('')
   const [secondary, setSecondary] = useState('')
   const [skills, setSkills] = useState<string[]>(['md', 'concise'])
+  // 写作技能库（角色专属技能的数据源；随角色选中自动注入）
+  const [libSkills, setLibSkills] = useState<WritingSkill[]>([])
   const [autoSave, setAutoSave] = useState(true)
   const [autoSaveTick, setAutoSaveTick] = useState(0)
   const [dirty, setDirty] = useState(false)
@@ -128,13 +133,19 @@ export default function WorkshopChat(props: Props) {
   // 草稿版本历史 / 导出成书
   const [historyOpen, setHistoryOpen] = useState(false)
   const [bookOpen, setBookOpen] = useState(false)
-  // 输入区高度可拖拽调整
-  const [inputHeight, setInputHeight] = useState(() => {
+  // # 知识库引用（范式 B：选择器挂载 → 发送时注入 system）
+  const [kbRefs, setKbRefs] = useState<KbRefPick[]>([])
+  const [kbPickerOpen, setKbPickerOpen] = useState(false)
+  const hashArmedRef = useRef(false)
+  // 输入区高度：默认自适应；手动拖拽后锁定像素高度（可再拖回）
+  const [inputHeight, setInputHeight] = useState<number | 'auto'>(() => {
     try {
-      const v = Number(localStorage.getItem('wb-chat-input-height'))
-      return Number.isNaN(v) ? 200 : Math.max(120, Math.min(400, v))
+      const raw = localStorage.getItem('wb-chat-input-height')
+      if (!raw || raw === 'auto') return 'auto'
+      const v = Number(raw)
+      return Number.isNaN(v) ? 'auto' : Math.max(120, Math.min(Math.round(window.innerHeight * 0.45), v))
     } catch {
-      return 200
+      return 'auto'
     }
   })
   const hResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
@@ -142,6 +153,7 @@ export default function WorkshopChat(props: Props) {
   const sessionRef = useRef('')
   const sessionRef2 = useRef('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputDockRef = useRef<HTMLDivElement | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* 默认模型（父级传值 + 兜底自读配置） */
@@ -171,7 +183,7 @@ export default function WorkshopChat(props: Props) {
         void window.api.sillytavern.chatsSave(storeKey, chatId, msgs)
       }, 400)
     },
-    [chatId]
+    [chatId, storeKey]
   )
 
   const refreshChatList = useCallback(async () => {
@@ -181,7 +193,7 @@ export default function WorkshopChat(props: Props) {
     } catch {
       setChatList([])
     }
-  }, [])
+  }, [storeKey])
 
   /* ---------- 加载/切换会话 ---------- */
   useEffect(() => {
@@ -202,9 +214,28 @@ export default function WorkshopChat(props: Props) {
       }
       refreshChatList()
     })
-    // 仅 chatId 变化才重载；切换角色上下文不重置历史
+    // chatId 或 storeKey（按作品隔离）任一变化都重载；切换角色上下文不重置历史
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId])
+  }, [chatId, storeKey])
+
+  /* ---------- 角色专属技能：库技能加载 + 按当前角色解析 ---------- */
+  useEffect(() => {
+    void window.api.novel
+      .listSkills()
+      .then((l) => setLibSkills((l as WritingSkill[]) ?? []))
+      .catch(() => undefined)
+  }, [])
+
+  const charSkillIds = useMemo(() => {
+    const ext = char?.card.extensions as Record<string, unknown> | undefined
+    const ids = ext?.lingmoSkills
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []
+  }, [char])
+
+  const charLibSkills = useMemo(
+    () => (charSkillIds.length ? libSkills.filter((s) => charSkillIds.includes(s.id)) : []),
+    [libSkills, charSkillIds]
+  )
 
   /* ---------- 自动滚动 ---------- */
   useEffect(() => {
@@ -236,34 +267,53 @@ export default function WorkshopChat(props: Props) {
     if (lastAiText && onInsertToChapter) onInsertToChapter(lastAiText)
   }, [lastAiText, onInsertToChapter])
 
-  /* ---------- 输入区高度拖拽调整 ---------- */
-  const startHResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    hResizeRef.current = { startY: e.clientY, startHeight: inputHeight }
-    document.body.style.cursor = 'row-resize'
-    document.body.style.userSelect = 'none'
-    const onMove = (ev: MouseEvent) => {
-      const r = hResizeRef.current
-      if (!r) return
-      const delta = r.startY - ev.clientY
-      const next = Math.min(400, Math.max(120, r.startHeight + delta))
-      setInputHeight(next)
-    }
-    const onUp = () => {
-      hResizeRef.current = null
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      try {
-        localStorage.setItem('wb-chat-input-height', String(inputHeight))
-      } catch {
-        /* ignore */
+  /* ---------- 输入区高度：自适应 + 手动拖拽锁定 ---------- */
+  const startHResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const dock = inputDockRef.current
+      const startH = typeof inputHeight === 'number' ? inputHeight : (dock?.offsetHeight ?? 200)
+      hResizeRef.current = { startY: e.clientY, startHeight: startH }
+      // 从 auto 切到固定高度时，先把当前实测高度写入，避免跳变
+      setInputHeight(startH)
+      document.body.style.cursor = 'row-resize'
+      document.body.style.userSelect = 'none'
+      let latest = startH
+      const onMove = (ev: MouseEvent) => {
+        const r = hResizeRef.current
+        if (!r) return
+        const delta = r.startY - ev.clientY
+        const maxH = Math.max(200, Math.round(window.innerHeight * 0.45))
+        latest = Math.min(maxH, Math.max(120, r.startHeight + delta))
+        setInputHeight(latest)
       }
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      const onUp = () => {
+        hResizeRef.current = null
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        try {
+          localStorage.setItem('wb-chat-input-height', String(latest))
+        } catch {
+          /* ignore */
+        }
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [inputHeight]
+  )
+
+  /** 恢复自适应高度 */
+  const resetInputHeight = useCallback(() => {
+    setInputHeight('auto')
+    try {
+      localStorage.setItem('wb-chat-input-height', 'auto')
+    } catch {
+      /* ignore */
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [inputHeight])
+  }, [])
 
   /* ---------- 停止 ---------- */
   const stop = useCallback(async (): Promise<void> => {
@@ -373,8 +423,34 @@ export default function WorkshopChat(props: Props) {
           /* 忽略：退化为无长篇上下文 */
         }
       }
-      // 技能约束追加到 system（长短篇共用同一套技能约束）
-      systemContent = buildSystemWithSkills(systemContent, skills)
+      // 技能约束追加到 system（长短篇共用同一套技能约束；第三参 = 角色专属技能，选中角色时自动生效）
+      systemContent = buildSystemWithSkills(systemContent, skills, charLibSkills)
+
+      // 知识库引用注入（# 选择器挂载的资产）
+      if (kbRefs.length) {
+        try {
+          const blocks = await window.api.knowledgeBase.resolveInject(kbRefs, userContent)
+          const inject = blocks.length ? await window.api.knowledgeBase.renderInject(blocks) : ''
+          if (inject) systemContent = [systemContent, inject].filter(Boolean).join('\n\n')
+          // 记录会话级引用（L3）
+          for (const p of kbRefs) {
+            void window.api.knowledgeBase
+              .addReference({
+                id: crypto.randomUUID(),
+                kbId: storeKey,
+                assetId: p.id,
+                assetType: p.kind,
+                scope: 'session',
+                channel: p.channel === 'schema' ? 'load-as-table' : p.channel === 'rag' ? 'rag' : 'full-text',
+                referencePosition: `chat:${chatId}`,
+                createdAt: Date.now()
+              })
+              .catch(() => undefined)
+          }
+        } catch {
+          /* 注入失败不阻断对话 */
+        }
+      }
 
       const aiHistory: AiChatMessage[] = []
       if (systemContent) aiHistory.push({ role: 'system', content: systemContent })
@@ -412,14 +488,36 @@ export default function WorkshopChat(props: Props) {
       sessionRef2.current = ''
       setStreaming(false)
     },
-    [char, world, authorNote, skills, primary, secondary, charName, sampling, persist, novelContext]
+    [char, world, authorNote, skills, primary, secondary, charName, sampling, persist, novelContext, kbRefs, storeKey, chatId, charLibSkills]
   )
 
   /* ---------- 发送 ---------- */
+  const handleInputChange = useCallback((v: string) => {
+    setInput(v)
+    // 范式 B：行首/空白后的 # 唤起选择器（仅触发一次，选完由按钮再次打开）
+    const m = /(^|\s)#(\s|$)/.exec(v)
+    if (m && !hashArmedRef.current) {
+      hashArmedRef.current = true
+      setKbPickerOpen(true)
+      // 把触发用的 # 从输入中去掉，避免当正文发出
+      setInput(v.replace(/(^|\s)#(\s|$)/, '$1$2'))
+    }
+    if (!/#/.test(v)) hashArmedRef.current = false
+  }, [])
+
   const send = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim()
       if (!content || streaming) return
+      // D1：聊天下任务 @任务 @角色 说明…
+      const hubCreate = (window as unknown as { __hubCreateFromChat?: (s: string) => Promise<boolean> }).__hubCreateFromChat
+      if (hubCreate && /^(@任务|@task|\/task|创建任务[:：])/i.test(content)) {
+        const handled = await hubCreate(content).catch(() => false)
+        if (handled) {
+          setInput('')
+          return
+        }
+      }
       setInput('')
       setDirty(true)
       const base = messages.filter((m) => !m.extra?.streaming)
@@ -609,13 +707,13 @@ export default function WorkshopChat(props: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* 工具条 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
+    <div className="workshop-chat" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      {/* 工具条：主操作常驻，次操作收进「更多」 */}
+      <div className="workshop-chat-toolbar">
         <Input
           aria-label="作品标题"
           variant="borderless"
-          style={{ maxWidth: 180, fontWeight: 600, fontSize: 14 }}
+          className="workshop-chat-title"
           value={title}
           onChange={(e) => {
             setTitle(e.target.value || '未命名写作')
@@ -626,81 +724,94 @@ export default function WorkshopChat(props: Props) {
         <Select
           aria-label="切换历史会话"
           size="small"
-          style={{ minWidth: 160, maxWidth: 240 }}
-          placeholder="切换历史会话"
+          className="workshop-chat-session"
+          placeholder="历史会话"
           value={chatId}
           options={chatList}
           onChange={switchChat}
           notFoundContent="暂无历史会话"
+          showSearch
+          optionFilterProp="label"
         />
-        <Button size="small" icon={<PlusOutlined />} onClick={() => void newChat()}>
+        <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => void newChat()}>
           新会话
         </Button>
-        <Popconfirm title="清空当前会话内容？" onConfirm={() => { setMessages([]); persist([]); setDirty(false) }}>
-          <Button size="small" icon={<ClearOutlined />} danger>
-            清空
-          </Button>
-        </Popconfirm>
-        <Tooltip title="撤销最后一条">
-          <Button size="small" icon={<UndoOutlined />} disabled={messages.length === 0} onClick={undoLast} />
-        </Tooltip>
-        <Tooltip title="压缩上下文：把早期对话总结为一段摘要">
-          <Button size="small" icon={<CompressOutlined />} disabled={messages.length < 4} onClick={() => void compressContext()}>
-            压缩
-          </Button>
-        </Tooltip>
         {onInsertToChapter && (
-          <Tooltip title="把最后一条 AI 回复写进当前章节正文（插入到光标处）">
-            <Button size="small" type="primary" icon={<FileAddOutlined />} disabled={!lastAiText || streaming} onClick={insertToChapter}>
+          <Tooltip title="把最后一条 AI 回复写进当前章节正文">
+            <Button
+              size="small"
+              type="primary"
+              icon={<FileAddOutlined />}
+              disabled={!lastAiText || streaming}
+              onClick={insertToChapter}
+            >
               插入本章
             </Button>
           </Tooltip>
         )}
         <div style={{ flex: 1 }} />
-        {char ? (
-          <Tag color="blue" style={{ margin: 0 }}>{char.card.name}</Tag>
-        ) : (
-          <Tag color="processing" style={{ margin: 0 }}>写作助手</Tag>
-        )}
-        {char && world && <Tag style={{ margin: 0 }}>世界书：{world.name}</Tag>}
-        <Tag style={{ margin: 0 }}>上下文 {tokenStats.messages} 条 / 约 {tokenStats.tokens} token</Tag>
-        {streaming && <Tag color="processing" style={{ margin: 0 }}>生成中</Tag>}
-        {dirty && <Tag color="orange" style={{ margin: 0 }}>未保存</Tag>}
-        {autoSaveTick > 0 && <Tag color="green" style={{ margin: 0 }}>草稿已保存</Tag>}
-        <Tooltip title="自动保存（30s）">
-          <Switch size="small" checked={autoSave} onChange={setAutoSave} checkedChildren="自动保存" unCheckedChildren="手动" />
+        <span className="workshop-chat-meta">
+          {char ? char.card.name : '写作助手'}
+          {' · '}
+          {tokenStats.messages} 条 / ~{tokenStats.tokens} tok
+          {streaming ? ' · 生成中' : ''}
+          {dirty ? ' · 未保存' : ''}
+        </span>
+        <Tooltip title="自动保存（每 30 秒）">
+          <Switch size="small" checked={autoSave} onChange={setAutoSave} checkedChildren="自动" unCheckedChildren="手动" />
         </Tooltip>
-        <Button size="small" disabled={messages.length === 0} onClick={() => void saveManual()}>
-          保存 MD
-        </Button>
-        <Tooltip title="草稿历史：查看与回滚这篇写作的历次自动/手动保存">
-          <Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>
-            历史
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              { key: 'undo', icon: <UndoOutlined />, label: '撤销最后一条', disabled: messages.length === 0 },
+              { key: 'compress', icon: <CompressOutlined />, label: '压缩上下文', disabled: messages.length < 4 },
+              { type: 'divider' },
+              { key: 'save', label: '保存 Markdown', disabled: messages.length === 0 },
+              { key: 'history', icon: <HistoryOutlined />, label: '草稿历史' },
+              { key: 'book', icon: <BookOutlined />, label: '导出成书' },
+              { type: 'divider' },
+              { key: 'clear', icon: <ClearOutlined />, label: '清空会话', danger: true }
+            ],
+            onClick: ({ key }) => {
+              if (key === 'undo') undoLast()
+              if (key === 'compress') void compressContext()
+              if (key === 'save') void saveManual()
+              if (key === 'history') setHistoryOpen(true)
+              if (key === 'book') void autoSaveDraft(true).finally(() => setBookOpen(true))
+              if (key === 'clear') {
+                Modal.confirm({
+                  title: '清空当前会话内容？',
+                  okText: '清空',
+                  okButtonProps: { danger: true },
+                  cancelText: '取消',
+                  onOk: () => {
+                    setMessages([])
+                    persist([])
+                    setDirty(false)
+                  }
+                })
+              }
+            }
+          }}
+        >
+          <Button size="small" type="text" aria-label="更多操作">
+            更多
           </Button>
-        </Tooltip>
-        <Tooltip title="导出成书：把写作草稿与笔记拼成一本书">
-          <Button
-            size="small"
-            icon={<BookOutlined />}
-            onClick={() => {
-              void autoSaveDraft(true).finally(() => setBookOpen(true))
-            }}
-          >
-            成书
-          </Button>
-        </Tooltip>
+        </Dropdown>
       </div>
 
-      {/* 消息区 */}
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px', background: 'var(--bg-canvas, #fafafa)' }}>
+      {/* 消息区：居中阅读栏，弱化壁纸干扰 */}
+      <div ref={scrollRef} className="workshop-chat-stream">
+        <div className="workshop-chat-stream-inner">
         {messages.length === 0 ? (
           <Empty
-            style={{ marginTop: 60 }}
+            style={{ marginTop: 48 }}
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               char
-                ? `与 ${char.card.name} 对话 —— 世界书 / 预设 / 作者注释已作为上下文生效，亦可挂载 MCP 工具与技能约束。`
-                : '统一的 AI 写作助手 —— 可在左侧选择角色卡注入人设、挂载 MCP 工具与技能约束；选中章节后，回复可一键「插入本章」。长对话自动折叠、可一键保存为 Markdown。'
+                ? `与 ${char.card.name} 对话。右侧可配置世界书 / 预设 / 作者注释。`
+                : '选择左侧角色注入人设，或直接开始写作。输入 # 可挂载本地知识库。'
             }
           />
         ) : (
@@ -710,34 +821,26 @@ export default function WorkshopChat(props: Props) {
             const lines = estimateLines(m.mes)
             const overflow = lines > MAX_VISIBLE_LINES
             const collapsed = overflow && m.extra?.collapsed !== false
-            const visibleText = collapsed ? m.mes.split('\n').slice(0, MAX_VISIBLE_LINES).join('\n') + '\n…（已折叠，点击展开）' : m.mes
+            const visibleText = collapsed ? m.mes.split('\n').slice(0, MAX_VISIBLE_LINES).join('\n') + '\n…（已折叠）' : m.mes
             const markdownMode = !isUser && !isSys
             return (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
+              <div key={i} className="workshop-msg">
                 <div
+                  className="workshop-msg-avatar"
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: isUser ? '#1677ff' : isSys ? '#faad14' : '#722ed1',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    flexShrink: 0
+                    background: isUser ? 'var(--accent, #1677ff)' : isSys ? '#faad14' : '#722ed1'
                   }}
                 >
                   {avatarText(m)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <div className="workshop-msg-head">
                     <Typography.Text strong style={{ fontSize: 13 }}>
                       {displayName(m)}
                     </Typography.Text>
                     {overflow && (
-                      <Button size="small" type="link" style={{ padding: 0, height: 'auto' }} onClick={() => toggleCollapse(i)}>
-                        {collapsed ? `展开（${lines - MAX_VISIBLE_LINES} 行）` : '收起'}
+                      <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => toggleCollapse(i)}>
+                        {collapsed ? `展开 ${lines - MAX_VISIBLE_LINES} 行` : '收起'}
                       </Button>
                     )}
                     {m.extra?.error && <Tag color="red" style={{ margin: 0 }}>错误</Tag>}
@@ -761,22 +864,14 @@ export default function WorkshopChat(props: Props) {
                     </Space.Compact>
                   ) : markdownMode && !collapsed ? (
                     <div
-                      className="markdown-preview"
-                      style={{ fontSize: 14, lineHeight: 1.7, padding: '8px 12px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--lm-border)', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}
+                      className="markdown-preview workshop-msg-body workshop-msg-body-md"
                       dangerouslySetInnerHTML={{ __html: renderPreview(visibleText) }}
                     />
                   ) : (
                     <div
-                      className="ai-msg-bubble"
+                      className="workshop-msg-body"
                       style={{
-                        whiteSpace: 'pre-wrap',
-                        fontSize: 14,
-                        lineHeight: 1.7,
-                        padding: '8px 12px',
-                        borderRadius: 10,
-                        background: isUser ? 'var(--accent-soft)' : 'var(--bg-elevated)',
-                        border: '1px solid var(--lm-border)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,.04)'
+                        background: isUser ? 'var(--accent-soft, rgba(22,119,255,.1))' : 'var(--bg-elevated, #fff)'
                       }}
                     >
                       {visibleText || (m.extra?.streaming ? <Spin size="small" /> : '')}
@@ -787,67 +882,129 @@ export default function WorkshopChat(props: Props) {
             )
           })
         )}
-      </div>
-
-      {/* 水平拖拽条：上下拖动调整输入区高度 */}
-      <div
-        title="上下拖动调整输入区高度"
-        onMouseDown={startHResize}
-        style={{
-          height: 6,
-          flexShrink: 0,
-          cursor: 'row-resize',
-          background: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <div style={{ width: '60%', height: 1, background: 'var(--border-color, rgba(128,128,128,.25))' }} />
-      </div>
-
-      {/* 输入区 */}
-      <div style={{ height: inputHeight, padding: '8px 16px 16px', background: 'var(--bg-canvas, #fafafa)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {quickReplies.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-            {quickReplies.map((q) => (
-              <Button key={q.id} size="small" onClick={() => void send(q.message)}>
-                {q.label}
-              </Button>
-            ))}
-          </div>
-        )}
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <ComposerInput
-            intro={
-              char
-                ? `与 ${char.card.name} 对话 —— 角色卡 / 世界书 / 预设 / 作者注释已作为上下文生效；技能约束、MCP 工具、上下文压缩均可使用。`
-                : '统一的 AI 写作助手 —— 可选左侧角色卡注入人设、右侧世界书 / 设定面板作为上下文；选中章节后可把回复「插入本章」。技能约束、MCP 工具、上下文压缩均可用。'
-            }
-            value={input}
-            onChange={setInput}
-            onSend={() => void send()}
-            onStop={() => void stop()}
-            streaming={streaming}
-            model={primary}
-            onModelChange={setPrimary}
-            secondaryModel={secondary}
-            onSecondaryModelChange={setSecondary}
-            modelOptions={MD_MODEL_OPTIONS}
-            skills={skills}
-            onSkillsChange={setSkills}
-            mcpTools={mcpTools}
-            enabledMcp={enabledMcp}
-            onEnabledMcpChange={setEnabledMcp}
-            placeholder={
-              char
-                ? `与 ${char.card.name} 对话…（Enter 发送，Shift+Enter 换行）`
-                : '输入消息，Enter 发送，Shift+Enter 换行'
-            }
-            promptSource="writing"
-          />
         </div>
       </div>
+
+      {/* 上下拖拽：自适应 ↔ 手动锁定高度 */}
+      <div
+        className="workshop-input-resize"
+        title={inputHeight === 'auto' ? '拖动可固定输入区高度；双击恢复自适应' : '拖动调整输入区高度；双击恢复自适应'}
+        onMouseDown={startHResize}
+        onDoubleClick={resetInputHeight}
+      >
+        <div className="workshop-input-resize-bar" />
+      </div>
+
+      {/* 输入区：与消息流同宽对齐，高度自适应或按拖拽锁定 */}
+      <div
+        ref={inputDockRef}
+        className="workshop-input-dock"
+        style={
+          inputHeight === 'auto'
+            ? { height: 'auto', minHeight: 148, maxHeight: '42%' }
+            : { height: inputHeight, minHeight: 120 }
+        }
+      >
+        <div className="workshop-input-dock-inner">
+          {quickReplies.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, flexShrink: 0 }}>
+              {quickReplies.map((q) => (
+                <Button key={q.id} size="small" onClick={() => void send(q.message)}>
+                  {q.label}
+                </Button>
+              ))}
+            </div>
+          )}
+          {kbRefs.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, flexShrink: 0, alignItems: 'center' }}>
+              {kbRefs.map((r) => (
+                <Tag
+                  key={`${r.kind}:${r.id}`}
+                  closable
+                  color={r.kind === 'data' ? 'gold' : r.kind === 'worldbook' ? 'purple' : 'blue'}
+                  onClose={() => setKbRefs((prev) => prev.filter((x) => !(x.kind === r.kind && x.id === r.id)))}
+                  style={{ margin: 0 }}
+                >
+                  {r.name}
+                  <span style={{ opacity: 0.65, marginLeft: 4 }}>
+                    {r.channel === 'rag' ? '检索' : r.channel === 'schema' ? '表结构' : '全文'}
+                  </span>
+                </Tag>
+              ))}
+              <Button size="small" type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setKbPickerOpen(true)}>
+                管理引用
+              </Button>
+            </div>
+          )}
+          {charLibSkills.length > 0 && (
+            <div style={{ marginBottom: 6, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                角色专属技能（自动生效）：
+              </Typography.Text>
+              {charLibSkills.map((s) => (
+                <Tooltip key={s.id} title={(s.template || s.description || '').slice(0, 200)}>
+                  <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+                    {s.name}
+                  </Tag>
+                </Tooltip>
+              ))}
+            </div>
+          )}
+          <div className="workshop-composer-slot">
+            <ComposerInput
+              compact
+              intro={
+                char
+                  ? `与 ${char.card.name} 对话 · # 挂载知识库`
+                  : 'AI 写作助手 · 输入 # 挂载知识库 · 选中章节后可插入本章'
+              }
+              value={input}
+              onChange={handleInputChange}
+              onSend={() => void send()}
+              onStop={() => void stop()}
+              streaming={streaming}
+              model={primary}
+              onModelChange={setPrimary}
+              secondaryModel={secondary}
+              onSecondaryModelChange={setSecondary}
+              modelOptions={MD_MODEL_OPTIONS}
+              skills={skills}
+              onSkillsChange={setSkills}
+              mcpTools={mcpTools}
+              enabledMcp={enabledMcp}
+              onEnabledMcpChange={setEnabledMcp}
+              extraActions={
+                <Tooltip title="引用本地知识库（或输入 #）">
+                  <Button
+                    size="small"
+                    icon={<NumberOutlined />}
+                    onClick={() => setKbPickerOpen(true)}
+                    type={kbRefs.length ? 'primary' : 'default'}
+                  >
+                    知识库{kbRefs.length ? ` ${kbRefs.length}` : ''}
+                  </Button>
+                </Tooltip>
+              }
+              placeholder={
+                char
+                  ? `与 ${char.card.name} 对话…（Enter 发送；# 挂载知识库）`
+                  : '输入消息…（Enter 发送；# 挂载知识库）'
+              }
+              promptSource="writing"
+            />
+          </div>
+        </div>
+      </div>
+
+      <KbTriggerPicker
+        open={kbPickerOpen}
+        onClose={() => {
+          setKbPickerOpen(false)
+          hashArmedRef.current = false
+        }}
+        value={kbRefs}
+        onChange={setKbRefs}
+      />
 
       <SnapshotDrawer
         open={historyOpen}

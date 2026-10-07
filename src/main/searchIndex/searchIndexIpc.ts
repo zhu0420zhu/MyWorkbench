@@ -95,7 +95,8 @@ export function registerSearchIndexIpc(): void {
   })
   ipcMain.handle('searchIndex:qa-prefs-set', async (_e, prefs: QaPrefs): Promise<QaPrefs> => {
     const cur = await prefsStore.get()
-    const merged: QaPrefs = { ...cur, ...prefs }
+    // cur 形状是 { prefs }，必须展开内层，否则 prefs 字段会被抬到顶层造成脏写
+    const merged: QaPrefs = { ...(cur.prefs ?? {}), ...prefs }
     await prefsStore.set({ prefs: merged })
     return merged
   })

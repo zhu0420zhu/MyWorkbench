@@ -23,13 +23,6 @@ function Root() {
   const { isDark } = useTheme()
   const { prefs } = usePrefs()
 
-  /**
-   * 浅色主题下，菜单 / 对话框等浮层背景色与透明度可由用户配置：
-   * - surfaceBg：表面背景色（HEX）
-   * - surfaceOpacity：不透明度 0–1
-   * 两者合成 rgba 同时作用于 antd 全局 token（colorBgElevated 菜单浮层 / colorBgContainer 对话框内容），
-   * 保证浅色主题下各界面元素视觉统一。暗色主题保持原有设计值。
-   */
   const surface = useMemo(() => {
     if (isDark) {
       return { elevated: '#20242F', container: '#20242F', mask: 'rgba(0, 0, 0, 0.45)' }
@@ -40,13 +33,41 @@ function Root() {
     return { elevated: rgba, container: rgba, mask: 'rgba(0, 0, 0, 0.45)' }
   }, [isDark, prefs.surfaceBg, prefs.surfaceOpacity])
 
-  // 把表面样式注入 CSS 变量，供自定义（非 antd token）组件复用
+  // 表面 / 壁纸 / 动效 → CSS 变量
   useEffect(() => {
     const el = document.documentElement
     const op = isDark ? 1 : Number.isFinite(prefs.surfaceOpacity) ? Math.min(1, Math.max(0, prefs.surfaceOpacity)) : 1
     el.style.setProperty('--wb-surface-bg', surface.elevated)
     el.style.setProperty('--wb-surface-opacity', String(op))
-  }, [surface, isDark, prefs.surfaceOpacity])
+    el.style.setProperty('--wp-opacity', String(Math.min(1, Math.max(0, prefs.wallpaperIntensity ?? 0.85))))
+    el.style.setProperty('--wp-c1', prefs.wallpaperColor || '#28607D')
+    el.style.setProperty('--wp-c2', prefs.wallpaperColor2 || '#46D4E6')
+    el.dataset.motion = prefs.motionLevel || 'full'
+  }, [
+    surface,
+    isDark,
+    prefs.surfaceOpacity,
+    prefs.wallpaperIntensity,
+    prefs.wallpaperColor,
+    prefs.wallpaperColor2,
+    prefs.motionLevel
+  ])
+
+  const layoutBg = useMemo(() => {
+    const mode = prefs.wallpaperMode || 'theme'
+    if (mode === 'theme') return isDark ? '#171923' : '#F6F1E6'
+    // 壁纸模式：布局必须近透明，否则 antd Layout 会盖住氛围层
+    return isDark ? 'rgba(14,16,22,0.35)' : 'rgba(243,239,230,0.28)'
+  }, [prefs.wallpaperMode, isDark])
+
+  // 壁纸开关标记：供 CSS 让内容区透明、侧栏玻璃更透
+  const wallpaperOn = (prefs.wallpaperMode || 'theme') !== 'theme'
+
+  useEffect(() => {
+    const el = document.documentElement
+    if (wallpaperOn) el.dataset.wpOn = '1'
+    else delete el.dataset.wpOn
+  }, [wallpaperOn])
 
   return (
     <ConfigProvider
@@ -55,10 +76,8 @@ function Root() {
         algorithm: getAntdAlgorithm(isDark),
         token: {
           colorPrimary: resolveAccent(prefs.colorPrimary, isDark),
-          /* 浅色国风 8px / 暗黑控制台 10px 圆角 */
           borderRadius: isDark ? 10 : 8,
-          /* 底色对齐设计稿：浅色宣纸 / 暗色 #171923 系 */
-          colorBgLayout: isDark ? '#171923' : '#F6F1E6',
+          colorBgLayout: layoutBg,
           colorBgContainer: surface.container,
           colorBgElevated: surface.elevated,
           colorBgMask: surface.mask

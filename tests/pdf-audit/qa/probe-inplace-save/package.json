@@ -1,0 +1,7 @@
+{
+  "name": "probe-inplace-save",
+  "private": true,
+  "version": "0.0.0",
+  "description": "QA 探针：真实 Electron 下验证 PDF 就地编辑「覆盖保存 / 另存为」链路（真实 preload + 真实 pdf IPC + 真实 pathAcl）",
+  "main": "main.js"
+}

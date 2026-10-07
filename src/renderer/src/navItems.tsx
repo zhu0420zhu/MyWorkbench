@@ -7,19 +7,27 @@ import {
   BgColorsOutlined,
   ToolOutlined,
   FolderOpenOutlined,
+  AppstoreOutlined,
   FireOutlined,
   BookOutlined,
   PushpinOutlined,
   FormOutlined,
   NotificationOutlined,
-  AppstoreOutlined,
-  BarChartOutlined
+  FileSearchOutlined,
+  ThunderboltOutlined,
+  // AppstoreOutlined,
+  BarChartOutlined,
+  BuildOutlined
 } from '@ant-design/icons'
+import { pageLabelOf } from '@shared/pageMeta'
 import type { PageKey } from './nav'
 
 /**
- * 导航元数据：侧边栏菜单、独立窗口标题、命令面板共用一份，
- * 避免"独立窗口标题"与"侧边栏名称"两处维护不同步。
+ * 导航元数据：侧边栏菜单、独立窗口标题、命令面板共用一份。
+ *
+ * 中文名不在这里硬编码，统一取自 `@shared/pageMeta` 的 PAGE_LABELS——
+ * 同一份名表还被主进程的窗口标题（pageWindows.ts）、命令面板（search.ts）、
+ * 设置默认页（Settings.tsx）引用，避免各处人工同步导致漂移。
  */
 export interface NavMeta {
   key: PageKey
@@ -27,24 +35,44 @@ export interface NavMeta {
   label: string
 }
 
-export const NAV: NavMeta[] = [
-  { key: 'dashboard', icon: <DashboardOutlined />, label: '自动工作台' },
-  { key: 'knowledge', icon: <BookOutlined />, label: '本地知识库' },
-  { key: 'filetools', icon: <FolderOpenOutlined />, label: '文件工具' },
-  { key: 'writing', icon: <FormOutlined />, label: '写作' },
-  { key: 'copywriting', icon: <NotificationOutlined />, label: '文案' },
-  { key: 'notes', icon: <FileTextOutlined />, label: '笔记' },
-  { key: 'stickies', icon: <PushpinOutlined />, label: '便利贴' },
-  { key: 'texttools', icon: <ToolOutlined />, label: '文本工具' },
-  { key: 'gameui', icon: <AppstoreOutlined />, label: '游戏UI设计' },
-  { key: 'database', icon: <DatabaseOutlined />, label: '数据整理' },
-  { key: 'boards', icon: <BgColorsOutlined />, label: '白板' },
-  { key: 'hotspots', icon: <FireOutlined />, label: '情报中心' },
-  { key: 'settings', icon: <SettingOutlined />, label: '设置' },
-  { key: 'analytics', icon: <BarChartOutlined />, label: '数据分析' }
+/**
+ * 有侧边栏入口的页面及其图标（顺序即默认展示顺序）。
+ * 隐藏页不在此列，但仍可通过 PAGE_LABELS 取到中文名。
+ */
+const NAV_DEFS: Array<{ key: PageKey; icon: ReactNode }> = [
+  { key: 'dashboard', icon: <DashboardOutlined /> },
+  { key: 'knowledge', icon: <BookOutlined /> },
+  { key: 'filetools', icon: <FolderOpenOutlined /> },
+  { key: 'docs', icon: <FileSearchOutlined /> },
+  { key: 'writing', icon: <FormOutlined /> },
+  { key: 'copywriting', icon: <NotificationOutlined /> },
+  { key: 'notes', icon: <FileTextOutlined /> },
+  { key: 'stickies', icon: <PushpinOutlined /> },
+  { key: 'texttools', icon: <ToolOutlined /> },
+  // 开发工具箱：独立侧栏入口（此前仅内嵌在文件工具页的「开发工具箱」分组里）
+  { key: 'toolbox', icon: <BuildOutlined /> },
+  // 暂时隐藏游戏UI设计入口（页面代码保留，恢复时取消注释）
+  // { key: 'gameui', icon: <AppstoreOutlined /> },
+  { key: 'database', icon: <DatabaseOutlined /> },
+  { key: 'boards', icon: <BgColorsOutlined /> },
+  { key: 'hotspots', icon: <FireOutlined /> },
+  { key: 'agents', icon: <ThunderboltOutlined /> },
+  { key: 'settings', icon: <SettingOutlined /> },
+  { key: 'analytics', icon: <BarChartOutlined /> }
 ]
 
-/** page key → 中文名（未知 key 回退为 key 本身） */
+export const NAV: NavMeta[] = NAV_DEFS.map(({ key, icon }) => ({
+  key,
+  icon,
+  label: pageLabelOf(key)
+}))
+
+/**
+ * page key → 中文名。
+ *
+ * 走 PAGE_LABELS 全量映射，**不要**改成「在 NAV 里查、查不到回退 key」——
+ * NAV 只含侧边栏收录页，隐藏页（如 ai）会因此显示成英文 key。
+ */
 export function pageLabel(page: string): string {
-  return NAV.find((n) => n.key === page)?.label ?? page
+  return pageLabelOf(page)
 }

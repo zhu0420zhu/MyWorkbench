@@ -4,8 +4,14 @@ node_modules/
 # Build output
 dist/
 out/
-build/
 release/
+
+# App icons live in build/ and are REQUIRED by the electron-builder config
+# (win.icon / nsis.installerIcon -> build/icon.ico, extraResources -> build/icon.png),
+# so ignore the directory contents but keep the two icons tracked.
+build/*
+!build/icon.ico
+!build/icon.png
 
 # Logs
 *.log
@@ -38,6 +44,18 @@ smoke_st/
 ck/
 design/
 resources/
+vendor/
+
+# Packaging / build caches
+.electron-builder-cache/
+*.tsbuildinfo
+
+# Local runtime logs
+logs/
+
+# SillyTavern runtime config (template with placeholder credential fields;
+# byte-identical to vendor/SillyTavern/config.yaml). Regenerated locally on demand.
+config.yaml
 
 # Root bundled artifact (generated, do not track)
 index.js

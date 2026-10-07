@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profile>
+ <version>LibreOffice v1</version>
+ <device>
+  <type>opencl</type>
+  <name>NVIDIA GeForce RTX 3060</name>
+  <driver>591.74</driver>
+  <time>24159</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>native</type>
+  <time>2078208</time>
+  <errors>false</errors>
+ </device>
+</profile>

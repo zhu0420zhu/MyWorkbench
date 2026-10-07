@@ -30,6 +30,9 @@ import {
   PartitionOutlined,
   SwapOutlined
 } from '@ant-design/icons'
+import ImageTools from './ImageTools'
+import VideoTools from './VideoTools'
+import HardwareTools from './HardwareTools'
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
@@ -391,8 +394,11 @@ function WatcherSection() {
   const [watched, setWatched] = useState<Watched>([])
 
   const refresh = async (): Promise<void> => {
-    const list = await window.api.tools.watcher.list()
-    setWatched(list)
+    try {
+      setWatched(await window.api.tools.watcher.list())
+    } catch (err) {
+      message.error('获取监控目录失败：' + (err as Error).message)
+    }
   }
 
   useEffect(() => {
@@ -420,6 +426,21 @@ const addDir = async (): Promise<void> => {
       void refresh()
     } else {
       message.error('目录不存在或已监控')
+    }
+  }
+
+  /** 移除一个监控目录：主进程会从被监控集合中删除，轮询时不再扫描它（可重新添加，故不做二次确认） */
+  const removeDir = async (path: string): Promise<void> => {
+    try {
+      const ok = await window.api.tools.watcher.remove(path)
+      if (ok) {
+        message.success('已移除监控目录')
+        await refresh()
+      } else {
+        message.error('移除失败：该目录不在监控列表中')
+      }
+    } catch (err) {
+      message.error('移除失败：' + (err as Error).message)
     }
   }
 
@@ -484,11 +505,26 @@ const addDir = async (): Promise<void> => {
         {watched.length === 0 ? (
           <Typography.Text type="secondary">（无）</Typography.Text>
         ) : (
-          watched.map((w) => (
-            <Tag key={w.path} style={{ marginBottom: 4 }}>
-              {w.name} · {w.path}
-            </Tag>
-          ))
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+            {watched.map((w) => (
+              <div key={w.path} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Tag style={{ margin: 0 }}>{w.name}</Tag>
+                <Typography.Text code style={{ fontSize: 12 }} ellipsis={{ tooltip: w.path }}>
+                  {w.path}
+                </Typography.Text>
+                <Button
+                  size="small"
+                  danger
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => void removeDir(w.path)}
+                >
+                  移除
+                </Button>
+              </div>
+            ))}
+          </div>
         )}
         <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
           {running ? (paused ? '（已暂停）' : '（运行中）') : '（未启动）'}
@@ -529,13 +565,36 @@ const addDir = async (): Promise<void> => {
 import CleanSection from './CleanSection'
 
 /* ---------- 智能分类与整理执行（organize） ---------- */
+
+/** 可选类目：与主进程 organizer.CLASSIFY_CATEGORIES 保持一致 */
+const ORGANIZE_CATEGORIES = ['文档', '图片', '视频', '音频', '压缩包', '代码', '安装包', '下载文件', '其他']
+
+type OrganizePlan = Awaited<ReturnType<typeof window.api.organize.generatePlan>>
+type PlanAction = OrganizePlan['actions'][number]
+
+/** 从计划项目标路径反推当前类目（目标路径 = 目标基目录/类目） */
+function categoryOfAction(a: PlanAction): string {
+  if (!a.targetPath) return ''
+  const parts = a.targetPath.split(/[\\/]/).filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : ''
+}
+
+/** 拼接目标基目录与类目（渲染层无 node:path，按基目录已有分隔符拼接） */
+function joinTarget(base: string, category: string): string {
+  const trimmed = base.replace(/[\\/]+$/, '')
+  const sep = base.includes('\\') ? '\\' : '/'
+  return `${trimmed}${sep}${category}`
+}
+
 function OrganizeSection() {
   const [files, setFiles] = useState('')
   const [useAi, setUseAi] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [plan, setPlan] = useState<Awaited<ReturnType<typeof window.api.organize.generatePlan>> | null>(null)
+  const [plan, setPlan] = useState<OrganizePlan | null>(null)
   const [result, setResult] = useState<Awaited<ReturnType<typeof window.api.organize.executePlan>> | null>(null)
   const [memory, setMemory] = useState<Awaited<ReturnType<typeof window.api.organize.memoryList>>>([])
+  /** 每项待改的类目（sourcePath → 类目）；未选择时回落到当前类目 */
+  const [categoryChoice, setCategoryChoice] = useState<Record<string, string>>({})
 
   const loadMemory = async (): Promise<void> => {
     try {
@@ -548,6 +607,52 @@ function OrganizeSection() {
     void loadMemory()
   }, [])
 
+  /** 类目下拉项：标准类目 + 计划里出现过的（AI 可能给出标准列表之外的类目） */
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>(ORGANIZE_CATEGORIES)
+    if (plan) {
+      for (const a of plan.actions) {
+        const c = categoryOfAction(a)
+        if (c) set.add(c)
+      }
+    }
+    return [...set].map((c) => ({ label: c, value: c }))
+  }, [plan])
+
+  /**
+   * 手动纠正某项的类目。
+   * 1) 写入分类纠正记忆（个性化：同一扩展名累计 2 次后，后续分类会优先采用该记忆）；
+   * 2) 就地把该项目标路径改到「目标基目录/新类目」，让界面立刻反映纠正结果。
+   */
+  const applyCategory = async (a: PlanAction): Promise<void> => {
+    const category = (categoryChoice[a.sourcePath] ?? categoryOfAction(a)).trim()
+    if (!category) {
+      message.warning('请先选择目标类目')
+      return
+    }
+    try {
+      await window.api.organize.recordCorrection(a.sourcePath, category)
+      const base = await window.api.organize.getTargetBase()
+      const targetPath = joinTarget(base, category)
+      setPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              actions: prev.actions.map((x) =>
+                x.sourcePath === a.sourcePath
+                  ? { ...x, targetPath, reason: `手动改类目：${category}` }
+                  : x
+              )
+            }
+          : prev
+      )
+      await loadMemory()
+      message.success(`已改类目为「${category}」并记入分类记忆`)
+    } catch (err) {
+      message.error('改类目失败：' + (err as Error).message)
+    }
+  }
+
   const preview = async (): Promise<void> => {
     const list = files.split(/\n|;/).map((f) => f.trim()).filter(Boolean)
     if (list.length === 0) {
@@ -558,6 +663,7 @@ function OrganizeSection() {
     try {
       const p = await window.api.organize.generatePlan(list, { useAi })
       setPlan(p)
+      setCategoryChoice({})
     } catch (err) {
       message.error('生成计划失败：' + (err as Error).message)
     } finally {
@@ -645,6 +751,24 @@ function OrganizeSection() {
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         → {a.targetPath ?? '删除'}
                       </Typography.Text>
+                      {a.actionType !== 'delete' && (
+                        <Space size={4}>
+                          <Select
+                            size="small"
+                            style={{ width: 118 }}
+                            aria-label={`为 ${a.sourcePath} 选择目标类目`}
+                            placeholder="新类目"
+                            value={categoryChoice[a.sourcePath] ?? (categoryOfAction(a) || undefined)}
+                            onChange={(v) =>
+                              setCategoryChoice((p) => ({ ...p, [a.sourcePath]: v }))
+                            }
+                            options={categoryOptions}
+                          />
+                          <Button size="small" onClick={() => void applyCategory(a)}>
+                            改类目
+                          </Button>
+                        </Space>
+                      )}
                     </List.Item>
                   )}
                 />
@@ -1005,7 +1129,17 @@ function CompareSection() {
 }
 
 /* ---------- 页面 ---------- */
+type FileGroup = 'files' | 'image' | 'video' | 'hw'
+
+const GROUP_META: Array<{ key: FileGroup; label: string; desc: string }> = [
+  { key: 'files', label: '文件管理', desc: '磁盘分析 · 目录占用 · 重复文件 · 目录监控 · 智能分类与整理 · 格式转换 · 磁盘清理' },
+  { key: 'image', label: '图片工具', desc: '裁剪 · 抠图 · 调色 · 转换压缩 · 拼接 · 图标' },
+  { key: 'video', label: '视频工具', desc: '转换 · 抽帧 · GIF · 音频处理 · FFmpeg 本地引擎' },
+  { key: 'hw', label: '硬件工具', desc: '剪贴板 · 整机 · CPU/内存 · 显卡 · 磁盘 · 网络 · 电源' }
+]
+
 export default function FileTools() {
+  const [group, setGroup] = useState<FileGroup>('files')
   return (
     <div className="texttools-page">
       <div className="page-header">
@@ -1013,22 +1147,37 @@ export default function FileTools() {
           文件工具
         </Typography.Title>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          磁盘分析 · 目录占用 · 重复文件 · 目录监控 · 智能分类与整理 · 格式转换 · 磁盘清理（由 ck 工具集移植）
+          {GROUP_META.find((g) => g.key === group)?.desc}
         </Typography.Text>
       </div>
-      <Tabs
-        defaultActiveKey="disk"
-        items={[
-          { key: 'disk', label: '磁盘信息', children: <DiskSection /> },
-          { key: 'analyze', label: '目录分析', children: <AnalyzeSection /> },
-          { key: 'duplicate', label: '重复检测', children: <DuplicateSection /> },
-          { key: 'compare', label: '目录对比', children: <CompareSection /> },
-          { key: 'watcher', label: '文件监控', children: <WatcherSection /> },
-          { key: 'organize', label: '智能分类与整理', children: <OrganizeSection /> },
-          { key: 'convert', label: '格式转换', children: <ConvertSection /> },
-          { key: 'clean', label: '磁盘清理', children: <CleanSection /> }
-        ]}
-      />
+
+      {/* 分组平铺按钮（Word 工具条式，无下拉） */}
+      <div className="tt-v2-toolbar" style={{ borderBottom: 'none', padding: '4px 0 8px' }}>
+        {GROUP_META.map((g) => (
+          <Button key={g.key} size="small" type={group === g.key ? 'primary' : 'default'} onClick={() => setGroup(g.key)}>
+            {g.label}
+          </Button>
+        ))}
+      </div>
+
+      {group === 'files' && (
+        <Tabs
+          defaultActiveKey="disk"
+          items={[
+            { key: 'disk', label: '磁盘信息', children: <DiskSection /> },
+            { key: 'analyze', label: '目录分析', children: <AnalyzeSection /> },
+            { key: 'duplicate', label: '重复检测', children: <DuplicateSection /> },
+            { key: 'compare', label: '目录对比', children: <CompareSection /> },
+            { key: 'watcher', label: '文件监控', children: <WatcherSection /> },
+            { key: 'organize', label: '智能分类与整理', children: <OrganizeSection /> },
+            { key: 'convert', label: '格式转换', children: <ConvertSection /> },
+            { key: 'clean', label: '磁盘清理', children: <CleanSection /> }
+          ]}
+        />
+      )}
+      {group === 'image' && <ImageTools embedded />}
+      {group === 'video' && <VideoTools embedded />}
+      {group === 'hw' && <HardwareTools embedded />}
     </div>
   )
 }

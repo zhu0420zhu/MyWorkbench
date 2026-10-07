@@ -12,18 +12,48 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "build:win": "electron-vite build && electron-builder --win",
-    "test:parse": "node --experimental-strip-types tests/verify-csv-parse.ts",
+    "test:parse": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/verify-csv-parse.ts",
     "test:pinyin": "node --experimental-strip-types tests/verify-pinyin.ts",
     "test:analytics": "node --experimental-strip-types tests/verify-analytics-chart.ts",
     "test:analytics-filters": "node --experimental-strip-types tests/verify-analytics-filters.ts",
     "test:kb-data-asset": "node --experimental-strip-types tests/verify-kb-data-asset.ts",
     "test:encoding": "node --experimental-strip-types tests/encoding.ts",
+    "test:format-error": "node --experimental-strip-types tests/formatError.test.mts",
+    "test:hw-cache": "node --experimental-strip-types tests/smoke-hw-cache.ts",
+    "test:pdf-security": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/test-pdf-security.mjs",
+    "test:pdf-guard": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-compress-encrypt-guard.mjs",
+    "test:pdf-compress-levels": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-compress-levels.mjs",
+    "test:pdf-raster-levels": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-raster-levels.mjs",
+    "test:pdf-crop-select": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-crop-select.mjs",
+    "test:pdf-page-number": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-page-number-preview.mjs",
+    "test:pdf-security-cross": "node tests/pdf-audit/verify-cross-pdfjs.mjs",
+    "test:pdf-ocr-extract": "node tests/pdf-audit/verify-pdf-ocr-extract.mjs",
+    "test:pdf-excel-orient": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-excel-orientation.mjs",
+    "test:pdf-split-batch": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-audit/verify-split-batch.mjs",
+    "test:smoke-ffmpeg": "node --experimental-strip-types tests/smoke-ffmpeg.mts",
+    "test:smoke-media": "node --experimental-strip-types tests/smoke-media-pdf.mts",
+    "test:workflow": "node --experimental-strip-types tests/smoke-workflow.ts",
     "bench:csv": "node --experimental-strip-types tests/bench-csv.ts",
     "bench:import": "node --experimental-strip-types tests/bench-import.ts",
     "bench:storage": "node --max-old-space-size=4096 --experimental-strip-types tests/bench-storage.ts",
-    "test:integration": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/integration-tables.ts"
+    "test:integration": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/integration-tables.ts",
+    "probe:ocr-resource": "node --experimental-strip-types tests/ocr-resource-probe.mjs",
+    "probe:temp-cleaner": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/temp-cleaner-probe.mjs",
+    "probe:watcher-cache": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/watcher-cache-probe.mjs",
+    "probe:watcher-persist": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/watcher-persist-probe.mjs",
+    "probe:pdf-actualtext": "node --experimental-strip-types tests/pdf-actualtext-probe.ts",
+    "probe:pdf-overflow": "node --experimental-strip-types tests/pdf-overflow-probe.ts",
+    "probe:docx-surgical": "node tests/docx-surgical-probe.mjs",
+    "probe:surgical": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/surgical-probe.mjs",
+    "probe:pdf-image-list": "node --expose-gc --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/pdf-image-list-probe.mjs",
+    "probe:charcard": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/charcard-probe.mjs",
+    "probe:legacy-profile-fallback": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/legacy-profile-fallback-probe.mjs",
+    "probe:surgical-legacy": "node --experimental-loader=./tests/loader.mjs --experimental-strip-types tests/legacy-surgical-probe.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "jszip": "^3.10.2",
+    "systeminformation": "^5.33.13"
+  },
   "devDependencies": {
     "@ant-design/icons": "^5.6.1",
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
@@ -49,7 +79,10 @@
     "tldraw": "^5.2.5",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "pptxgenjs": "^4.0.1"
   },
   "build": {
     "appId": "com.lingmo.workbench",
@@ -65,7 +98,14 @@
       {
         "from": "resources",
         "to": "resources"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icons/icon.png"
       }
+    ],
+    "asarUnpack": [
+      "**/node_modules/systeminformation/**"
     ],
     "electronDownload": {
       "isVerifyChecksum": false

@@ -1,0 +1,354 @@
+{
+  "result": {
+    "rows": [
+      {
+        "name": "preload 暴露 api.docs.saveAsFormat",
+        "pass": true,
+        "detail": "function"
+      },
+      {
+        "name": "空内容守卫 · 空串（text 源 → pdf） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 空串（text 源 → pdf） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 空串（text 源 → html 目标） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 空串（text 源 → html 目标） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 纯空白（text 源 → html 目标） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 纯空白（text 源 → html 目标） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 纯空白（text 源 → docx 目标） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 纯空白（text 源 → docx 目标） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 只有标签壳 <p><br></p>（html 源） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 只有标签壳 <p><br></p>（html 源） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 只有 &nbsp;（html 源） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 只有 &nbsp;（html 源） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 只有数字实体空白（html 源） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 只有数字实体空白（html 源） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 只有注释与 script（html 源） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 只有注释与 script（html 源） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫 · 只有空白段落（html 源） → 明确失败且不弹对话框",
+        "pass": true,
+        "detail": "ok=false error=没有可导出的内容（编辑区是空的），已取消"
+      },
+      {
+        "name": "空内容守卫 · 只有空白段落（html 源） → 未产出路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "空内容守卫反例 · 含单个可见字符（html 源） → 必须放行",
+        "pass": true,
+        "detail": "ok=true path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例1.html error=undefined"
+      },
+      {
+        "name": "空内容守卫反例 · css 里藏着文本（html 源） → 必须放行",
+        "pass": true,
+        "detail": "ok=true path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例2.html error=undefined"
+      },
+      {
+        "name": "空内容守卫反例 · 实体解出的可见字符（html 源） → 必须放行",
+        "pass": true,
+        "detail": "ok=true path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/反例3.html error=undefined"
+      },
+      {
+        "name": "扩展名对齐 · 用户把文件名写成 .doc，选了 txt → 落盘后缀 /对齐测试.txt",
+        "pass": true,
+        "detail": "path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/对齐测试.txt"
+      },
+      {
+        "name": "扩展名对齐 · 用户把文件名写成 .pdf，选了 html → 落盘后缀 /网页.html",
+        "pass": true,
+        "detail": "path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/网页.html"
+      },
+      {
+        "name": "扩展名对齐 · 用户完全不写扩展名，选了 md → 落盘后缀 /无扩展名.md",
+        "pass": true,
+        "detail": "path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/无扩展名.md"
+      },
+      {
+        "name": "扩展名对齐 · 用户写的扩展名正好正确 → 落盘后缀 /已经是.txt",
+        "pass": true,
+        "detail": "path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/已经是.txt"
+      },
+      {
+        "name": "扩展名对齐 · 大小写不同（.TXT vs txt）→ 保留用户写法但格式一致 → 落盘后缀 /大小写.TXT",
+        "pass": true,
+        "detail": "path=D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/大小写.TXT"
+      },
+      {
+        "name": "· 观察：text 源 + txt 目标 + 纯空白内容 → ok=true（该分支无空内容守卫，会写出一份空 .txt）",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "白名单外格式 \"exe\" → 明确拒绝",
+        "pass": true,
+        "detail": "ok=false error=不支持导出为 .exe 格式（支持：md / txt / html / docx / odt / rtf / epub / pdf）"
+      },
+      {
+        "name": "白名单外格式 \"sh\" → 明确拒绝",
+        "pass": true,
+        "detail": "ok=false error=不支持导出为 .sh 格式（支持：md / txt / html / docx / odt / rtf / epub / pdf）"
+      },
+      {
+        "name": "白名单外格式 \"空\" → 明确拒绝",
+        "pass": true,
+        "detail": "ok=false error=不支持导出为 .? 格式（支持：md / txt / html / docx / odt / rtf / epub / pdf）"
+      },
+      {
+        "name": "用户取消保存 → ok:false / error=cancelled",
+        "pass": true,
+        "detail": "ok=false error=cancelled"
+      },
+      {
+        "name": "用户取消保存 → 未返回路径",
+        "pass": true,
+        "detail": "undefined"
+      },
+      {
+        "name": "PDF · 非空内容 → 导出成功",
+        "pass": true,
+        "detail": "ok=true error=undefined"
+      },
+      {
+        "name": "PDF · 落盘扩展名被对齐为 .pdf",
+        "pass": true,
+        "detail": "D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as/导出未对齐名.pdf"
+      },
+      {
+        "name": "· 工作目录 D:/YM/MyWorkbench/tests/pdf-audit/qa/qa-work/save-as",
+        "pass": true,
+        "detail": ""
+      }
+    ],
+    "expectedSaveDialogs": 11
+  },
+  "dialogCalls": [
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "反例1.html",
+        "filters": [
+          {
+            "name": "反例1.html",
+            "extensions": [
+              "html"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "反例2.html",
+        "filters": [
+          {
+            "name": "反例2.html",
+            "extensions": [
+              "html"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "反例3.html",
+        "filters": [
+          {
+            "name": "反例3.html",
+            "extensions": [
+              "html"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "对齐测试.txt",
+        "filters": [
+          {
+            "name": "对齐测试.txt",
+            "extensions": [
+              "txt"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "网页.html",
+        "filters": [
+          {
+            "name": "网页.html",
+            "extensions": [
+              "html"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "无扩展名.md",
+        "filters": [
+          {
+            "name": "无扩展名.md",
+            "extensions": [
+              "md"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "已经是.txt",
+        "filters": [
+          {
+            "name": "已经是.txt",
+            "extensions": [
+              "txt"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "大小写.txt",
+        "filters": [
+          {
+            "name": "大小写.txt",
+            "extensions": [
+              "txt"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "纯空白文本观察.txt",
+        "filters": [
+          {
+            "name": "纯空白文本观察.txt",
+            "extensions": [
+              "txt"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "另存为",
+        "defaultPath": "取消用例.txt",
+        "filters": [
+          {
+            "name": "取消用例.txt",
+            "extensions": [
+              "txt"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "save",
+      "options": {
+        "title": "导出 PDF",
+        "defaultPath": "导出未对齐名.pdf",
+        "filters": [
+          {
+            "name": "PDF",
+            "extensions": [
+              "pdf"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

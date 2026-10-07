@@ -123,17 +123,49 @@ function buildImagemagickMap(): FormatMap {
   return map
 }
 
+/**
+ * 判断路径是否落在 Windows 系统目录（SystemRoot / System32）。
+ * Windows 自带 `C:\Windows\System32\convert.exe` 是 NTFS/FAT 卷转换工具，
+ * 与 ImageMagick 的 `convert` 同名但完全无关——必须显式排除，否则
+ * `which('convert')` 会命中它造成「imagemagick 可用=true」的假阳性。
+ */
+function isWindowsSystemPath(p: string): boolean {
+  if (process.platform !== 'win32') return false
+  const norm = p.toLowerCase().replace(/\//g, '\\')
+  const winDir = (process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows')
+    .toLowerCase()
+    .replace(/\//g, '\\')
+  return norm.startsWith(`${winDir}\\`) || norm.includes('\\system32\\')
+}
+
 export class ImageMagickConverter extends BaseConverter {
   name = 'imagemagick'
   formatMap: FormatMap = buildImagemagickMap()
 
+  /**
+   * 解析真正的 ImageMagick 可执行文件：
+   * 优先内置 resources/tools → 系统 PATH；仅在没有 `magick` 时才考虑旧版 `convert`，
+   * 且 `convert` 命中 Windows 系统目录时视为非 ImageMagick（见 isWindowsSystemPath）。
+   */
+  private resolveBinary(): string | null {
+    const bundledMagick = this.resolveBundledTool('magick')
+    if (bundledMagick) return bundledMagick
+    const bundledConvert = this.resolveBundledTool('convert')
+    if (bundledConvert && !isWindowsSystemPath(bundledConvert)) return bundledConvert
+    const whichMagick = this.which('magick')
+    if (whichMagick) return whichMagick
+    const whichConvert = this.which('convert')
+    if (whichConvert && !isWindowsSystemPath(whichConvert)) return whichConvert
+    return null
+  }
+
   isAvailable(): boolean {
-    return this.checkToolAvailable('magick') || this.checkToolAvailable('convert')
+    return this.resolveBinary() !== null
   }
 
   private getCommandPrefix(): string {
-    if (this.checkToolAvailable('magick')) return this.getToolPath('magick')
-    return this.getToolPath('convert')
+    // isAvailable() 为 false 时注册表会跳过该转换器，此处仅作兜底
+    return this.resolveBinary() ?? this.getToolPath('magick')
   }
 
   async convert(

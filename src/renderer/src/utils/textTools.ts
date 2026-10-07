@@ -376,3 +376,153 @@ export function firstLetterPinyin(input: string): string {
   })
   return arr.join(' ')
 }
+
+/* ===== 竞品补齐：清理 / 全半角 / 词频 / Markdown / 批量替换 ===== */
+
+/** 全角 → 半角（含空格） */
+export function toHalfWidth(input: string): string {
+  return input.replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0)).replace(/　/g, ' ')
+}
+
+/** 半角 → 全角 */
+export function toFullWidth(input: string): string {
+  return input.replace(/[!-~]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0xfee0)).replace(/ /g, '　')
+}
+
+/** 去除中英文标点 */
+export function removePunctuation(input: string, keepWhitespace = true): string {
+  const ws = keepWhitespace ? '\\s' : ''
+  const re = new RegExp(`[!-/:-@\\[-\`{-~！-／：-＠［-｀｛-～、。，．；：？！「」『』（）【】《》…—·"']`, 'g')
+  return input.replace(re, '').replace(new RegExp(`[^\\w\\u4e00-\\u9fa5${ws}]+`, 'g'), '')
+}
+
+/** 词频统计（中英混合） */
+export function wordFrequency(input: string, topN = 30): string {
+  const map = new Map<string, number>()
+  const en = input.toLowerCase().match(/[a-z']+/g) ?? []
+  for (const w of en) if (w.length > 1) map.set(w, (map.get(w) ?? 0) + 1)
+  const zh = input.match(/[一-龥]+/g) ?? []
+  for (const seg of zh) {
+    for (let i = 0; i < seg.length; i++) {
+      map.set(seg[i], (map.get(seg[i]) ?? 0) + 1)
+      if (i + 1 < seg.length) {
+        const bi = seg.slice(i, i + 2)
+        map.set(bi, (map.get(bi) ?? 0) + 1)
+      }
+    }
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([k, n]) => `${n}\t${k}`)
+    .join('\n')
+}
+
+/** 去 Markdown 标记 */
+export function stripMarkdown(input: string): string {
+  return input
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[^\n]*\n?/g, ''))
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^\s*>\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/^\|.*\|$/gm, (row) => row.replace(/\|/g, ' ').trim())
+    .replace(/^[-\s|]+$/gm, '')
+}
+
+/** slug：文件名/URL 安全串 */
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w一-龥]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+}
+
+/** 批量替换：每行「查找|替换」或「查找=替换」 */
+export function multiReplace(input: string, rules: string): string {
+  const lines = splitLines(rules)
+  let out = input
+  for (const line of lines) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const sep = t.includes('|') ? '|' : '='
+    const idx = t.indexOf(sep)
+    if (idx <= 0) continue
+    const from = t.slice(0, idx)
+    const to = t.slice(idx + 1)
+    if (!from) continue
+    out = out.split(from).join(to)
+  }
+  return out
+}
+
+/** HTML → 纯文本 */
+export function htmlToText(input: string): string {
+  return input
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** 行首/行尾加前后缀 */
+export function addPrefixSuffix(input: string, prefix = '', suffix = ''): string {
+  return joinLines(splitLines(input).map((l) => prefix + l + suffix))
+}
+
+/** 详细统计 */
+export function countStatsDetail(input: string): {
+  lines: number
+  chars: number
+  charsNoSpace: number
+  words: number
+  chinese: number
+  english: number
+  numbers: number
+} {
+  const base = countStats(input)
+  const chinese = (input.match(/[一-龥]/g) ?? []).length
+  const english = (input.match(/[a-zA-Z]+/g) ?? []).length
+  const numbers = (input.match(/\d+/g) ?? []).length
+  const charsNoSpace = [...input.replace(/\s/g, '')].length
+  return { ...base, charsNoSpace, chinese, english, numbers }
+}
+
+/** 合并段落为单行 */
+export function paragraphsToLines(input: string, sep = ' '): string {
+  return splitLines(input)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(sep)
+}
+
+/** 按空行合并段内行 */
+export function mergeBlankParagraphs(input: string): string {
+  return input
+    .split(/\n\s*\n/)
+    .map((p) =>
+      p
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join(' ')
+    )
+    .filter(Boolean)
+    .join('\n\n')
+}

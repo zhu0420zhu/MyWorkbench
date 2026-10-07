@@ -5,7 +5,6 @@ import {
   listAdapters,
   getAdapter,
   openLoginWindow,
-  closeLoginWindow,
   checkLogin,
   checkAllLogin,
   makePublishContext,
@@ -43,10 +42,6 @@ export function registerPublishIpc(): void {
 
   ipcMain.handle('publish:login', (_e, platformId: string) => {
     openLoginWindow(platformId)
-    return true
-  })
-  ipcMain.handle('publish:close-login', () => {
-    closeLoginWindow()
     return true
   })
   ipcMain.handle('publish:check-login', (_e, platformId: string) => checkLogin(platformId))

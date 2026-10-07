@@ -1,0 +1,7 @@
+{
+  "name": "probe-image-edit",
+  "private": true,
+  "version": "0.0.0",
+  "description": "QA 探针：真实 Electron 渲染进程里驱动 PdfInPlaceEditor 的图片四按钮（DOM 事件级 e2e）",
+  "main": "main.js"
+}

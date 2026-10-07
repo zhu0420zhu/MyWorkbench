@@ -1,0 +1,7 @@
+{
+  "name": "pdf-inplace-replace-probe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "description": "探针：在真实 Chromium（真实 canvas）里调用项目真实实现 replacePdfText，验证就地改字的端到端行为。"
+}

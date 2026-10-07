@@ -1,0 +1,142 @@
+{
+  "rows": [
+    [
+      true,
+      "dec-owner-only-r4.pdf            无口令打开 → 3 页(期望3), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-classic-xref-aes128.pdf      无口令打开 → 3 页(期望3), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-classic-xref-rc4.pdf         无口令打开 → 3 页(期望3), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-incremental-aes128.pdf       无口令打开 → 3 页(期望3), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-real-large-aes128.pdf        无口令打开 → 34 页(期望34), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-real-large-rc4.pdf           无口令打开 → 34 页(期望34), is_encrypted=False"
+    ],
+    [
+      true,
+      "dec-long-pwd-aes128.pdf          无口令打开 → 3 页(期望3), is_encrypted=False"
+    ],
+    [
+      true,
+      "owner-only-r4.pdf            加密=True 页=3 无口令被拒=False(期望False)"
+    ],
+    [
+      true,
+      "classic-xref-aes128.pdf      加密=True 页=3 无口令被拒=True(期望True)"
+    ],
+    [
+      true,
+      "classic-xref-rc4.pdf         加密=True 页=3 无口令被拒=True(期望True)"
+    ],
+    [
+      true,
+      "incremental-aes128.pdf       加密=True 页=3 无口令被拒=True(期望True)"
+    ],
+    [
+      true,
+      "real-large-aes128.pdf        加密=True 页=34 无口令被拒=True(期望True)"
+    ],
+    [
+      true,
+      "real-large-rc4.pdf           加密=True 页=34 无口令被拒=True(期望True)"
+    ],
+    [
+      true,
+      "enc-source.pdf   V=4 R=4 CFM=AESV2 P=-3904 (期望 V4 R4 AESV2 P=-3904)"
+    ],
+    [
+      true,
+      "enc-real.pdf     V=4 R=4 CFM=AESV2 P=-3904 (期望 V4 R4 AESV2 P=-3904)"
+    ],
+    [
+      true,
+      "enc-longpwd.pdf  V=4 R=4 CFM=AESV2 P=-3904 (期望 V4 R4 AESV2 P=-3904)"
+    ],
+    [
+      true,
+      "enc-source.pdf   用户口令(len=18) → 3 页, is_encrypted=True"
+    ],
+    [
+      true,
+      "enc-source.pdf   所有者口令 → 3 页"
+    ],
+    [
+      true,
+      "enc-source.pdf   无口令被拒"
+    ],
+    [
+      true,
+      "enc-source.pdf   错误口令被拒"
+    ],
+    [
+      true,
+      "enc-real.pdf     用户口令(len=18) → 34 页, is_encrypted=True"
+    ],
+    [
+      true,
+      "enc-real.pdf     所有者口令 → 34 页"
+    ],
+    [
+      true,
+      "enc-real.pdf     无口令被拒"
+    ],
+    [
+      true,
+      "enc-real.pdf     错误口令被拒"
+    ],
+    [
+      true,
+      "enc-longpwd.pdf  用户口令(len=40) → 3 页, is_encrypted=True"
+    ],
+    [
+      true,
+      "enc-longpwd.pdf  所有者口令 → 3 页"
+    ],
+    [
+      true,
+      "enc-longpwd.pdf  无口令被拒"
+    ],
+    [
+      true,
+      "enc-longpwd.pdf  错误口令被拒"
+    ]
+  ],
+  "enc_stats": {
+    "enc-source.pdf": {
+      "V": 4,
+      "R": 4,
+      "Length": 128,
+      "P": -3904,
+      "CFM": "AESV2",
+      "StmF": "StdCF"
+    },
+    "enc-real.pdf": {
+      "V": 4,
+      "R": 4,
+      "Length": 128,
+      "P": -3904,
+      "CFM": "AESV2",
+      "StmF": "StdCF"
+    },
+    "enc-longpwd.pdf": {
+      "V": 4,
+      "R": 4,
+      "Length": 128,
+      "P": -3904,
+      "CFM": "AESV2",
+      "StmF": "StdCF"
+    }
+  }
+}

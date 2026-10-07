@@ -88,10 +88,14 @@ export default function PublishDrawer({ open, item, onClose }: PublishDrawerProp
       message.warning('请填写 AppID 和 Secret')
       return
     }
-    await window.api.publish.gzhSave({ appId: gzhAppId.trim(), secret: gzhSecret.trim() })
-    setGzhOpen(false)
-    message.success('公众号凭证已保存（safeStorage 加密）')
-    void refreshPublishState()
+    try {
+      await window.api.publish.gzhSave({ appId: gzhAppId.trim(), secret: gzhSecret.trim() })
+      setGzhOpen(false)
+      message.success('公众号凭证已保存（本机加密存储）')
+      void refreshPublishState()
+    } catch (err) {
+      message.error('凭证保存失败：' + ((err as Error).message || '未知'))
+    }
   }
 
   const doPublish = async (): Promise<void> => {
@@ -442,7 +446,7 @@ export default function PublishDrawer({ open, item, onClose }: PublishDrawerProp
             onChange={(e) => setGzhSecret(e.target.value)}
           />
           <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            Secret 使用系统安全存储（safeStorage）加密保存，仅用于调用微信官方接口创建图文草稿。
+            Secret 使用系统安全存储加密保存（不可用时降级本地弱加密），仅用于调用微信官方接口创建图文草稿。
           </Typography.Text>
         </div>
       </Modal>

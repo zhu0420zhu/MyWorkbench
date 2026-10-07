@@ -398,7 +398,6 @@ function registerResizeIpc(): void {
     if (win) drags.delete(win.id)
   }
   ipcMain.on('window:resize-end', end)
-  ipcMain.on('window:resize-cancel', end)
 }
 
 /* ------------------------------------------------------------------ */
@@ -424,18 +423,27 @@ export function isCloseGuardMinimize(): boolean {
   return closeGuardMinimize
 }
 
-function resolveTrayIcon(): string | null {
-  const candidates = [
+/** 托盘图标候选路径：打包态 <resourcesPath>/icons/，开发态仓库内 build/ 或 resources/icons/ */
+function trayIconCandidates(): string[] {
+  return [
     join(process.resourcesPath, 'icons', 'icon.png'),
-    join(app.getAppPath(), 'build', 'icon.png')
+    join(app.getAppPath(), 'build', 'icon.png'),
+    join(app.getAppPath(), 'resources', 'icons', 'icon.png')
   ]
-  return candidates.find((p) => existsSync(p)) ?? null
+}
+
+function resolveTrayIcon(): string | null {
+  return trayIconCandidates().find((p) => existsSync(p)) ?? null
 }
 
 function trayAvailable(): boolean {
   if (tray && !tray.isDestroyed()) return true
   const icon = resolveTrayIcon()
-  if (!icon) return false
+  if (!icon) {
+    // 不静默：图标缺失会导致托盘不可用，明确记录候选路径便于定位打包配置问题
+    console.warn(`[tray] 未找到托盘图标，后台托盘不可用。已尝试: ${trayIconCandidates().join(' ; ')}`)
+    return false
+  }
   try {
     tray = new Tray(icon)
   } catch {
@@ -612,11 +620,6 @@ export function registerWindowIpc(): void {
   ipcMain.handle('window:set-close-behavior', (_e, b: CloseBehavior) =>
     setCloseBehavior(b === 'minimize' || b === 'quit' ? b : 'ask')
   )
-
-  ipcMain.handle('window:show-primary', () => {
-    restorePrimary()
-    return true
-  })
 
   ipcMain.handle('window:navigate-main', (_e, page: string, id?: string) =>
     navigatePrimaryWindow(page, id)

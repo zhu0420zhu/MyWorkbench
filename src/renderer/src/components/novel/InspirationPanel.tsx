@@ -32,6 +32,7 @@ import type {
   SkillRunResult,
   WritingSkill
 } from '@shared/types'
+import WorkflowPanel from './WorkflowPanel'
 
 /** 七种灵感类型的展示元数据 */
 const KIND_META: Record<InspirationKind, { label: string; color: string }> = {
@@ -62,7 +63,7 @@ export default function InspirationPanel({
   currentChapterId,
   reloadKey
 }: InspirationPanelProps) {
-  const [segment, setSegment] = useState<'pool' | 'skill'>('pool')
+  const [segment, setSegment] = useState<'workflow' | 'pool' | 'skill'>('workflow')
   const [inspirations, setInspirations] = useState<InspirationNote[]>([])
   const [skills, setSkills] = useState<WritingSkill[]>([])
   const [loading, setLoading] = useState(false)
@@ -393,15 +394,20 @@ export default function InspirationPanel({
           size="small"
           block
           value={segment}
-          onChange={(v) => setSegment(v as 'pool' | 'skill')}
+          onChange={(v) => setSegment(v as 'workflow' | 'pool' | 'skill')}
           options={[
+            { label: '工作流', value: 'workflow' },
             { label: '灵感池', value: 'pool' },
             { label: '写作 Skill', value: 'skill' }
           ]}
         />
       </div>
 
-      {segment === 'pool' ? (
+      {segment === 'workflow' ? (
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '8px 10px' }}>
+          <WorkflowPanel projectId={projectId} currentChapterId={currentChapterId} reloadKey={reloadKey} />
+        </div>
+      ) : segment === 'pool' ? (
         <>
           <div style={{ padding: '8px 10px' }}>
             <Button

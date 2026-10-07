@@ -1,4 +1,4 @@
-import type { AiTool, McpToolInfo } from '@shared/types'
+import type { AiTool, McpToolInfo, WritingSkill } from '@shared/types'
 import { BUILTIN_SKILLS } from '../ComposerInput'
 
 /**
@@ -21,12 +21,26 @@ export function buildTools(enabledMcp: string[], mcpTools: McpToolInfo[]): AiToo
     }))
 }
 
-/** 把已选技能约束追加到 system 末尾（[写作约束] 包裹）；无技能时原样返回 */
-export function buildSystemWithSkills(system: string | undefined, skills: string[]): string | undefined {
+/**
+ * 把已选技能约束追加到 system 末尾（[写作约束] 包裹）；
+ * libSkills = 角色专属技能（写作技能库，选中角色时自动生效），以 [角色专属技能] 段落注入，
+ * 模板节选 400 字符（与主进程 agentsHub runner 的注入口径一致）。两者都为空时原样返回。
+ */
+export function buildSystemWithSkills(
+  system: string | undefined,
+  skills: string[],
+  libSkills: WritingSkill[] = []
+): string | undefined {
   const skillHints = skills
     .map((k) => BUILTIN_SKILLS.find((s) => s.key === k)?.hint)
     .filter(Boolean)
     .join('\n')
-  if (!skillHints) return system
-  return [system, `[写作约束]\n${skillHints}`].filter(Boolean).join('\n\n')
+  const libHints = libSkills
+    .map((s) => `【${s.name}】${(s.template || s.description || '').slice(0, 400)}`)
+    .join('\n')
+  if (!skillHints && !libHints) return system
+  const parts = [system]
+  if (skillHints) parts.push(`[写作约束]\n${skillHints}`)
+  if (libHints) parts.push(`[角色专属技能]\n${libHints}`)
+  return parts.filter(Boolean).join('\n\n')
 }

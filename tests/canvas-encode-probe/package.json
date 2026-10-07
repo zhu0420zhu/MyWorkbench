@@ -1,0 +1,7 @@
+{
+  "name": "canvas-encode-probe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "description": "探针：实测 Chromium Canvas.toBlob 支持的 MIME。用于验证图片工具格式转换的能力边界。"
+}

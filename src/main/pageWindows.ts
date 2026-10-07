@@ -14,25 +14,16 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
 import { attachWindowManager, pageProfile } from './windowManager'
+import { pageLabelOf } from '../shared/pageMeta'
 
-/** 页面 key → 窗口标题（中文，与侧边栏导航保持一致） */
-const PAGE_TITLES: Record<string, string> = {
-  dashboard: '自动工作台',
-  notes: '笔记',
-  ai: 'AI 助手',
-  database: '数据整理',
-  boards: '白板',
-  texttools: '文本工具',
-  filetools: '文件工具',
-  knowledge: '本地知识库',
-  agents: '智能体',
-  stickies: '便利贴',
-  hotspots: '情报中心',
-  writing: '写作',
-  copywriting: '文案',
-  gameui: '游戏UI设计',
-  settings: '设置'
-}
+/**
+ * 页面 key → 窗口标题。
+ *
+ * 中文名不再在此硬编码，统一取自 `../shared/pageMeta` 的 PAGE_LABELS，
+ * 与渲染层侧边栏（navItems.tsx）、命令面板（search.ts）同源。
+ * 另注：此处设置的 title 仅作用于窗口创建瞬间，
+ * 渲染层 PageWindowShell 会用 document.title 覆盖为「<页面名> · 灵墨工作台」。
+ */
 
 /** key = `${page}:${id ?? ''}` */
 const windows = new Map<string, BrowserWindow>()
@@ -102,7 +93,7 @@ export async function openPageWindow(page: string, id?: string): Promise<boolean
     autoHideMenuBar: true,
     frame: false,
     backgroundColor: '#141414',
-    title: PAGE_TITLES[page] ?? page,
+    title: pageLabelOf(page),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -154,5 +145,5 @@ export function closeAllPageWindows(): void {
 
 /** 供渲染层展示标题用 */
 export function pageTitle(page: string): string {
-  return PAGE_TITLES[page] ?? page
+  return pageLabelOf(page)
 }
