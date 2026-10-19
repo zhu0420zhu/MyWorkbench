@@ -120,3 +120,17 @@ src/
 - [x] 便利贴（置顶悬浮 + 日历）· 模块合并（自动工作台 / 数据整理）· 多格式导入导出
 - [x] 打包 Windows 安装包（nsis + portable）
 - [ ] CSDN 适配器 · 更多发布平台 · 应用商店分发
+
+## 许可证
+
+本项目采用 **Apache License 2.0** 授权，全文见 [LICENSE](LICENSE)。
+
+Copyright 2026 zhu0420zhu
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+### 第三方组件
+
+仓库中包含的第三方组件（如 `tests/pdf-audit/pylibs/` 下的 Pillow、lxml、pikepdf 等）遵循其各自许可证，详见对应目录下的 `LICENSE` 文件；Apache-2.0 不改变这些组件原有的授权条款。

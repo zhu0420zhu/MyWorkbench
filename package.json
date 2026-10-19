@@ -4,6 +4,7 @@
   "description": "灵墨工作台：工具聚合 + 知识库 + 数据库 + 白板 + 自动化 + AI",
   "main": "./out/main/index.js",
   "private": true,
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "npx electron-vite dev",
     "build": "electron-vite build",
